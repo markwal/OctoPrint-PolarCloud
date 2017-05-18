@@ -1,0 +1,4 @@
+include README.md
+recursive-include octoprint_polarcloud/templates *
+recursive-include octoprint_polarcloud/translations *
+recursive-include octoprint_polarcloud/static *
