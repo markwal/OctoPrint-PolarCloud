@@ -505,11 +505,34 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	#~~ update
 
-	def _on_update(self, data *args, **kwargs):
+	def _on_update(self, data, *args, **kwargs):
 		if not self._valid_packet(data):
 			return
 		# TODO software update
 
+	#~~ job
+	def _job(self, job_id, state):
+		self._logger.debug('job')
+		if self._serial:
+			self._socket.emit('job', {
+				'serialNumber': self._serial,
+				'jobId': job_id,
+				'state': state
+			})
+		pass
+
+	#~~ setVersion
+	def _set_version(self):
+		self._logger.debug('setVersion')
+		if self._serial:
+			from octoprint._version import get_versions
+			octoprint_version = get_versions()["version"]
+			self._socket.emit('setVersion', {
+				'serialNumber': self._serial,
+				'runningVersion': octoprint_version,
+				'latestVersion': octoprint_version # TODO interrogate the softwareupdate plugin
+			})
+		pass
 
 	#~~ EventHandlerPlugin mixin
 
