@@ -85,6 +85,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	PSTATE_ERROR = "12"
 
 	def __init__(self):
+		self._serial = None
 		self._socket = None
 		self._challenge = None
 		self._task_queue = Queue.Queue()
@@ -93,7 +94,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._update_interval = 60
 		self._cloud_print = False
 		self._job_id = "123"
-		self._pstate = PSTATE_IDLE # only applies if _cloud_print
+		self._pstate = self.PSTATE_IDLE # only applies if _cloud_print
 		self._pstate_counter = 0
 
 	##~~ SettingsPlugin mixin
@@ -161,8 +162,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _valid_packet(self, data):
 		if not self._serial or self._serial != data.get("serialNumber", ""):
-			self._logger.debug("Serial number is '{}'", self._serial))
-			self._logger.debug("Ignoring message to '{}'", data.get("serialNumber", ""))
+			self._logger.debug("Serial number is '{}'".format(repr(self._serial)))
+			self._logger.debug("Ignoring message to '{}'".format(data.get("serialNumber", "")))
 			return False
 		return True
 
@@ -539,7 +540,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def on_event(self, event, payload):
 		if event == Events.PRINT_CANCELLED:
 			if self._cloud_print:
-				self._pstate = PSTATE_CANCELLING
+				self._pstate = self.PSTATE_CANCELLING
 				self._pstate_counter = 3
 		if event == Events.PRINT_STARTED or event == Events.PRINT_RESUMED:
 			self._update_interval = 10
