@@ -412,7 +412,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			})
 			self._task_queue.put(self._ensure_idle_upload_url)
 		else:
-			self._logger.debug('skip emit hello, serial: {}'.format(serial))
+			self._logger.debug('skip emit hello, serial: {}'.format(self._serial))
 
 	#~~ register -> polar: registerReponse
 
