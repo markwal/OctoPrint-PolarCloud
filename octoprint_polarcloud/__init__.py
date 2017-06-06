@@ -174,10 +174,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		# Create socket and set up event handlers
 		try:
-			self._socket = SocketIO(self._settings.get(['service']), 8080, LoggingNamespace, wait_for_connection=False)
-		except (TimeoutError, ConnectionError):
+			self._socket = SocketIO(self._settings.get(['service']), 8080, Namespace=LoggingNamespace, verify=True, wait_for_connection=False)
+		except (TimeoutError, ConnectionError, StopIteration):
 			self._socket = None
-			self._logger.warn('Unable to open socket {}'.format(get_exception_string()))
+			self._logger.exception('Unable to open socket {}'.format(get_exception_string()))
 			return
 
 		# Register all the socket messages
@@ -342,15 +342,19 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			loc = self._upload_location[upload_type]
 			r = requests.get(self._snapshot_url, timeout=5)
 			r.raise_for_status()
+		except Exception as e:
+			self._logger.exception("Could not capture image from {}".format(self._snapshot_url))
 
+		try:
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('image.jpg', r.content)})
+			self._logger.debug("{}".format(p.text))
 			p.raise_for_status()
 			t = p.status_code
 			self._logger.debug("{}: {}".format(t, p.content))
 
 			self._logger.debug("Image captured from {}".format(self._snapshot_url))
 		except Exception as e:
-			self._logger.exception("Could not capture image from {}".format(self._snapshot_url))
+			self._logger.exception("Could not post snapshot to PolarCloud")
 
 	#~~ getUrl -> polar: getUrlResponse
 
@@ -431,13 +435,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _register(self, email, pin):
 		self._get_keys()
 		if not self.key:
-			logger.info("Can't register because unable to generate signing key")
+			self._logger.info("Can't register because unable to generate signing key")
 			return False
 
 		if not self._socket:
 			self._create_socket()
 		if not self._socket:
-			logger.info("Can't register because unable to communicate with Polar Cloud")
+			self._logger.info("Can't register because unable to communicate with Polar Cloud")
 			return False
 
 		self._logger.info("emit register")
