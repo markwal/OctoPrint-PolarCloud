@@ -65,6 +65,7 @@ def has_all(dictionary, *keys):
 			return False
 	return True
 
+
 class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
                        octoprint.plugin.AssetPlugin,
                        octoprint.plugin.TemplatePlugin,
@@ -174,6 +175,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		# Create socket and set up event handlers
 		try:
+			self._connected = True
 			self._socket = SocketIO(self._settings.get(['service']), Namespace=LoggingNamespace, verify=True, wait_for_connection=False)
 		except (TimeoutError, ConnectionError, StopIteration):
 			self._socket = None
@@ -181,6 +183,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 
 		# Register all the socket messages
+		self._socket.on('disconnect', self._on_disconnect)
 		self._socket.on('registerResponse', self._on_register_response)
 		self._socket.on('welcome', self._on_welcome)
 		self._socket.on('getUrlResponse', self._on_get_url_response)
@@ -293,7 +296,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.wait(seconds=10)
 		self._check_versions()
 
-		while True:
+		while self._connected:
 			try:
 				if self._serial:
 					status = self._current_status()
@@ -314,6 +317,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					except Queue.Empty:
 						pass
 					self._socket.wait(seconds=1)
+					if not self._connected:
+						self._serial = None
+						break
 
 				if self._serial:
 					self._upload_snapshot()
@@ -322,16 +328,25 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				import traceback
 				self._logger.warn("polar_status exception: {}".format(traceback.format_exc()))
 
+		self._socket = None
+		self._polar_status_worker = None
+
+	def _on_disconnect(self):
+		self._logger.debug("[Disconnected]")
+		self._connected = False
+
 	def _check_versions(self):
 		try:
 			softwareupdate = self._plugin_manager.get_plugin_info('softwareupdate')
 			if softwareupdate and 'implementation' in dir(softwareupdate):
 				softwareupdate = softwareupdate.implementation
-				version_info = softwareupdate.get_current_versions(['octoprint'])
-				running_version = version_info['octoprint']['information']['current']
-				latest_version = version_info['octoprint']['information']['remote']['value']
+				version_info = softwareupdate.get_current_versions(['octoprint'])[0]['octoprint']
+				self._logger.debug("version_info: {}".format(repr(version_info)))
+				running_version = version_info['displayVersion']
+				latest_version = version_info['information']['remote']['value']
 		except:
 			self._logger.exception("Couldn't get softwareupdate plugin information")
+			return
 
 		if running_version == 'unknown' or latest_version == 'unknown':
 			self._logger.warn("Unable to determine current version or available version of OctoPrint")
@@ -375,10 +390,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		try:
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('image.jpg', r.content)})
-			self._logger.debug("{}".format(p.text))
 			p.raise_for_status()
-			t = p.status_code
-			self._logger.debug("{}: {}".format(t, p.content))
+			self._logger.debug("{}: {}".format(p.status, p.content))
 
 			self._logger.debug("Image captured from {}".format(self._snapshot_url))
 		except Exception as e:
