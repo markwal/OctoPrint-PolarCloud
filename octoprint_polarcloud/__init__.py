@@ -102,7 +102,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def get_settings_defaults(self, *args, **kwargs):
 		self._logger.info("get_settings_defaults")
 		return dict(
-			service="localhost",
+			service="localhost:8080",
 			serial=None,
 			printer_type=None,
 			email=""
@@ -174,7 +174,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		# Create socket and set up event handlers
 		try:
-			self._socket = SocketIO(self._settings.get(['service']), 8080, Namespace=LoggingNamespace, verify=True, wait_for_connection=False)
+			self._socket = SocketIO(self._settings.get(['service']), Namespace=LoggingNamespace, verify=True, wait_for_connection=False)
 		except (TimeoutError, ConnectionError, StopIteration):
 			self._socket = None
 			self._logger.exception('Unable to open socket {}'.format(get_exception_string()))
@@ -245,12 +245,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		status = {
 			"serialNumber": self._serial,
 			"status": self._polar_status_from_state(),
-			"tool0": temps['tool0']['actual'] if 'tool0' in temps else 0.0,
-			"tool1": temps['tool1']['actual'] if 'tool1' in temps else 0.0,
-			"bed": temps['bed']['actual'] if 'bed' in temps else 0.0,
-			"targetTool0": temps['tool0']['target'] if 'tool0' in temps else 0.0,
-			"targetTool1": temps['tool1']['target'] if 'tool1' in temps else 0.0,
-			"targetBed": temps['bed']['target'] if 'bed' in temps else 0.0,
 			"jobId": self._get_job_id(),
 			"protocol": "2",
 			"progress": "",
@@ -266,6 +260,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"sliceDetails": "",  # Cura_SteamEngine output
 			"securityCode": ""   # three colors
 		}
+		if 'tool0' in temps:
+			status['tool0'] = temps['tool0']['actual']
+			status['targetTool0'] = temps['tool0']['target']
+		if 'tool1' in temps:
+			status['tool1'] = temps['tool1']['actual']
+			status['targetTool1'] = temps['tool1']['target']
+		if 'bed' in temps:
+			status['bed'] = temps['bed']['actual']
+			status['targetBed'] = temps['bed']['target']
+
 		if self._printer.is_printing():
 			data = self._printer.get_current_data()
 			status["progress"] = str_safe_get(data, 'state', 'text')
@@ -286,7 +290,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			task()
 		except Queue.Empty:
 			pass
-		self._socket.wait(seconds=5)
+		self._socket.wait(seconds=10)
+		self._check_versions()
+
 		while True:
 			try:
 				if self._serial:
@@ -315,6 +321,28 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			except Exception as e:
 				import traceback
 				self._logger.warn("polar_status exception: {}".format(traceback.format_exc()))
+
+	def _check_versions(self):
+		try:
+			softwareupdate = self._plugin_manager.get_plugin_info('softwareupdate')
+			if softwareupdate and 'implementation' in dir(softwareupdate):
+				softwareupdate = softwareupdate.implementation
+				version_info = softwareupdate.get_current_versions(['octoprint'])
+				running_version = version_info['octoprint']['information']['current']
+				latest_version = version_info['octoprint']['information']['remote']['value']
+		except:
+			self._logger.exception("Couldn't get softwareupdate plugin information")
+
+		if running_version == 'unknown' or latest_version == 'unknown':
+			self._logger.warn("Unable to determine current version or available version of OctoPrint")
+			return
+
+		self._logger.debug('setVersion')
+		self._socket.emit('setVersion', {
+			'serialNumber': self._serial,
+			'runningVersion': running_version,
+			'latestVersion': latest_version
+		})
 
 	#~~ time-lapse and snapshots to cloud
 
@@ -407,8 +435,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'serialNumber': self._serial,
 				'signature': base64.b64encode(crypto.sign(self.key, self._challenge, b'sha256')),
 				'MAC': get_mac(),
-				'localIp': get_ip(),
-				'protocol': '2'
+				'localIP': get_ip(),
+				'protocol': '2',
+				'camUrl': self._settings.global_get(["webcam", "stream"])
 			})
 			self._task_queue.put(self._ensure_idle_upload_url)
 		else:
