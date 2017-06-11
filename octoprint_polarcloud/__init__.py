@@ -31,12 +31,14 @@ import Queue
 import base64
 import datetime
 from time import sleep
+import StringIO
 
 from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
 import sarge
 import flask
 import requests
+from PIL import Image
 
 import octoprint.plugin
 import octoprint.util
@@ -99,6 +101,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._job_id = "123"
 		self._pstate = self.PSTATE_IDLE # only applies if _cloud_print
 		self._pstate_counter = 0
+		self._max_image_size = 150000
 
 	##~~ SettingsPlugin mixin
 
@@ -108,7 +111,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			service="https://printer2.polar3d.com",
 			serial=None,
 			printer_type=None,
-			email=""
+			email="",
+			max_image_size = 150000
 		)
 
 	##~~ AssetPlugin mixin
@@ -151,6 +155,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("on_after_startup")
 		self._get_keys()
 		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
+		self._max_image_size = self._settings.get(['max_image_size'])
 		self._serial = self._settings.get(['serial'])
 		if self._serial:
 			self._start_polar_status()
@@ -416,7 +421,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.exception("Could not capture image from {}".format(self._snapshot_url))
 
 		try:
-			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('image.jpg', r.content)})
+			image_bytes = r.content
+			if len(image_bytes) > self._max_image_size:
+				buf = StringIO.StringIO()
+				buf.write(image_bytes)
+				image = Image.open(buf)
+				image.thumbnail((640, 480))
+				image_bytes = StringIO.StringIO()
+				image.save(image_bytes, format="jpeg")
+			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('image.jpg', image_bytes)})
 			p.raise_for_status()
 			self._logger.debug("{}: {}".format(p.status_code, p.content))
 
