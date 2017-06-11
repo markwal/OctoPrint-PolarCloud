@@ -105,7 +105,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def get_settings_defaults(self, *args, **kwargs):
 		self._logger.info("get_settings_defaults")
 		return dict(
-			service="localhost:8080",
+			service="https://printer2.polar3d.com",
 			serial=None,
 			printer_type=None,
 			email=""
