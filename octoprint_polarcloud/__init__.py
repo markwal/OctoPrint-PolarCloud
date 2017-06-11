@@ -367,30 +367,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("[Disconnected]")
 		self._connected = False
 
-	def _check_versions(self):
-		try:
-			softwareupdate = self._plugin_manager.get_plugin_info('softwareupdate')
-			if softwareupdate and 'implementation' in dir(softwareupdate):
-				softwareupdate = softwareupdate.implementation
-				version_info = softwareupdate.get_current_versions(['octoprint'])[0]['octoprint']
-				self._logger.debug("version_info: {}".format(repr(version_info)))
-				running_version = version_info['displayVersion']
-				latest_version = version_info['information']['remote']['value']
-		except:
-			self._logger.exception("Couldn't get softwareupdate plugin information")
-			return
-
-		if running_version == 'unknown' or latest_version == 'unknown':
-			self._logger.warn("Unable to determine current version or available version of OctoPrint")
-			return
-
-		self._logger.debug('setVersion')
-		self._socket.emit('setVersion', {
-			'serialNumber': self._serial,
-			'runningVersion': running_version,
-			'latestVersion': latest_version
-		})
-
 	#~~ time-lapse and snapshots to cloud
 
 	def _create_timelapse(self):
@@ -595,9 +571,46 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _on_update(self, data, *args, **kwargs):
 		if not self._valid_packet(data):
 			return
-		# TODO software update
+		try:
+			softwareupdate = self._get_softwareupdate_plugin()
+			if softwareupdate:
+				softwareupdate.perform_updates()
+		except:
+			self._logger.exception("Couldn't perform update via softwareupdate plugin")
+
+	def _get_softwareupdate_plugin(self):
+		softwareupdate = self._plugin_manager.get_plugin_info('softwareupdate')
+		if softwareupdate and 'implementation' in dir(softwareupdate):
+			return softwareupdate.implementation
+		return None
+
+	#~~ setVersion
+
+	def _check_versions(self):
+		try:
+			softwareupdate = self._get_softwareupdate_plugin()
+			if softwareupdate:
+				version_info = softwareupdate.get_current_versions(['octoprint'])[0]['octoprint']
+				self._logger.debug("version_info: {}".format(repr(version_info)))
+				running_version = version_info['displayVersion']
+				latest_version = version_info['information']['remote']['value']
+		except:
+			self._logger.exception("Couldn't get softwareupdate plugin information")
+			return
+
+		if running_version == 'unknown' or latest_version == 'unknown':
+			self._logger.warn("Unable to determine current version or available version of OctoPrint")
+			return
+
+		self._logger.debug('setVersion')
+		self._socket.emit('setVersion', {
+			'serialNumber': self._serial,
+			'runningVersion': running_version,
+			'latestVersion': latest_version
+		})
 
 	#~~ job
+
 	def _job(self, job_id, state):
 		self._logger.debug('job')
 		if self._serial:
@@ -605,19 +618,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'serialNumber': self._serial,
 				'jobId': job_id,
 				'state': state
-			})
-		pass
-
-	#~~ setVersion
-	def _set_version(self):
-		self._logger.debug('setVersion')
-		if self._serial:
-			from octoprint._version import get_versions
-			octoprint_version = get_versions()["version"]
-			self._socket.emit('setVersion', {
-				'serialNumber': self._serial,
-				'runningVersion': octoprint_version,
-				'latestVersion': octoprint_version # TODO interrogate the softwareupdate plugin
 			})
 		pass
 
