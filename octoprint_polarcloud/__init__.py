@@ -109,6 +109,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.info("get_settings_defaults")
 		return dict(
 			service="https://printer2.polar3d.com",
+			service_ui="https://polar3d.com",
 			serial=None,
 			printer_type=None,
 			email="",

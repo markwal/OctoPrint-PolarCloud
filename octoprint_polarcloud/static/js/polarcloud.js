@@ -29,9 +29,26 @@ $(function() {
         self.pin = ko.observable("");
         self.registering = ko.observable(false);
         self.registrationFailed = ko.observable(false);
+        self.printerTypes = ko.observableArray()
 
-        self.onBeforeBinding = function () {
+        self._ensureCurrentPrinterType = function() {
+            if (self.printerTypes().indexOf(self.settings.printer_type()) < 0)
+                self.printerTypes.push(self.settings.printer_type());
+        };
+
+        self.onBeforeBinding = function() {
             self.settings = self.settingsViewModel.settings.plugins.polarcloud;
+            self._ensureCurrentPrinterType();
+        };
+
+        self.onSettingsShown = function() {
+            $.ajax(self.settings.service_ui() + "/api/v1/printer_makes", { headers: "" })
+                .done(function(response) {
+                    if ("printerMakes" in response) {
+                        self.printerTypes(response["printerMakes"]);
+                        self._ensureCurrentPrinterType();
+                    }
+                });
         };
 
         self.showRegistration = function() {
