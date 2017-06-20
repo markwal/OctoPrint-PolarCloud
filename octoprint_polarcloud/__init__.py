@@ -477,7 +477,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.warn('getUrlResponse lacks a required property')
 		response["expires"] = (datetime.datetime.now() + datetime.timedelta(seconds=int(response.get("expires", 0))))
 		self._upload_location[response.get('type', 'idle')] = response
-		self._logger.debug('response["type"] = {}', response.get('type', ''))
+		self._logger.debug('response_type = {}'.format(response.get('type', '')))
 		if response.get('type', '') == 'idle':
 			self._task_queue.put(self._upload_snapshot)
 
@@ -660,7 +660,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._file_manager.slice('cura',
 					FileDestinations.LOCAL, path,
 					FileDestinations.LOCAL, pathGcode,
-					position=pos, profile="PolarCloud",
+					position=pos, profile="polarcloud",
 					callback=self._on_slicing_complete,
 					callback_args=(self._file_manager.path_on_disk(FileDestinations.LOCAL, pathGcode),))
 		else:
@@ -867,7 +867,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		height_from_layer_count = lambda x: x * layer_height
 		bool_from_int = lambda x: not not x
 
-		# if key in ("filament_diameter", "print_temperature", "start_gcode", "end_gcode"):
 		profile_from_engine_config = {
 			"layerthickness":       ("layer_height",       mm_from_um),
 			"printspeed":           ("print_speed",        no_translation),
@@ -918,8 +917,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"supportxydistance":    ("support_xy_distance", mm_from_um),
 			"supportzdistance":     ("support_z_distance", mm_from_um),
 			"supportlinedistance":  ("support_fill_rate",  lambda x: 100.0 * extrusion_width / mm_from_um(x)),
-			"startcode":            ("start.gcode",        lambda x: [x[3:-3]]),
-			"endcode":              ("end.gcode",          lambda x: [x[3:-3]])
+			"startcode":            ("start_gcode",        lambda x: ["; ignore octoprint default temps T0:{print_temperature} bed:{print_bed_temperature}\n" + x[3:-3]]),
+			"endcode":              ("end_gcode",          lambda x: [x[3:-3]])
 		}
 
 		profile = dict()
