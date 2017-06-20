@@ -31,7 +31,8 @@ import Queue
 import base64
 import datetime
 from time import sleep
-import StringIO
+from StringIO import StringIO
+import io
 
 from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
@@ -44,9 +45,11 @@ import octoprint.plugin
 import octoprint.util
 from octoprint.util import get_exception_string
 from octoprint.events import Events
+from octoprint.filemanager import FileDestinations
+from octoprint.filemanager.util import StreamWrapper
 
-logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
-logging.basicConfig()
+# logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
+# logging.basicConfig()
 
 # what's a mac address we can use as an identifier?
 def get_mac():
@@ -60,6 +63,9 @@ def get_ip():
 # rather than throw MissingKey
 def str_safe_get(dictionary, *keys):
 	return reduce(lambda d, k: d.get(k) if isinstance(d, dict) else "", keys, dictionary)
+def float_safe_get(dictionary, *keys):
+	s = str_safe_get(dictionary, *keys)
+	return 0.0 if not s else float(s)
 
 # return true if each of the list of keys are in the dictionary, otherwise false
 def has_all(dictionary, *keys):
@@ -80,7 +86,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	PSTATE_PRINTING = "3"       # Printing a cloud print
 	PSTATE_PAUSED = "4"
 	PSTATE_POSTPROCESSING = "5" # Performing post-print operations
-	PSTATE_CANCELING = "6"      # Canceling a print originated from the cloud
+	PSTATE_CANCELLING = "6"     # Canceling a print originated from the cloud
 	PSTATE_COMPLETE = "7"       # Completed a print originated from the cloud
 	PSTATE_UPDATING = "8"       # Busy updating OctoPrint and/or plugins
 	PSTATE_COLDPAUSED = "9"
@@ -91,13 +97,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def __init__(self):
 		self._serial = None
 		self._socket = None
-		self._connected = None
+		self._connected = False
+		self._status_now = False
 		self._challenge = None
 		self._task_queue = Queue.Queue()
 		self._polar_status_worker = None
 		self._upload_location = {}
 		self._update_interval = 60
 		self._cloud_print = False
+		self._cloud_print_info = {}
+		self._job_pending = False
 		self._job_id = "123"
 		self._pstate = self.PSTATE_IDLE # only applies if _cloud_print
 		self._pstate_counter = 0
@@ -164,7 +173,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	##~~ utility functions
 
 	def _get_job_id(self):
-		if self._printer.is_printing():
+		if self._printer.is_printing() or self._printer.is_paused():
 			return self._job_id
 		else:
 			return '0'
@@ -228,7 +237,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self.key = None
 			self._logger.error("Unable to generate or access key.")
 
-	# map from OctoPrint's notion of state to Polar's notion
 	def _polar_status_from_state(self):
 		state_mapping = {
 			"OPEN_SERIAL": self.PSTATE_ERROR,
@@ -246,7 +254,36 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"UNKNOWN": self.PSTATE_ERROR,
 			"NONE": self.PSTATE_ERROR
 		}
-		return state_mapping[self._printer.get_state_id()]
+		# this is a bit complicated because the mapping isn't direct and while
+		# we try to keep track of current polar state, current octoprint state
+		# wins, so we let _pstate show through if it "matches" current octoprint
+		if self._cloud_print and self._pstate_counter:
+			# if we've got a counter, we're still repeating completion/cancel
+			# message, do that
+			self._pstate_counter -= 1
+			if not self._pstate_counter:
+				self._cloud_print = False
+			return self._pstate
+
+		state = state_mapping[self._printer.get_state_id()]
+
+		if state == self.PSTATE_SERIAL:
+			# if we were ever printing, we owe a "job" completion message
+			self._job_pending = True
+		if self._cloud_print:
+			if state == self.PSTATE_IDLE and self._pstate == self.PSTATE_PREPARING:
+				# octoprint thinks were idle, but we must be slicing
+				return self._pstate
+			if state == self.PSTATE_SERIAL:
+				# octoprint thinks we're printing
+				return self.PSTATE_PRINTING
+			if state != self.PSTATE_PAUSED:
+				# if we aren't preparing, printing or paused and we're not
+				# counting down anymore, we must really be done
+				self._cloud_print = False
+				self._job_id = "123"
+				self._cloud_print_info = {}
+		return state
 
 	def _current_status(self):
 		temps = self._printer.get_current_temperatures()
@@ -279,15 +316,18 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			status['bed'] = temps['bed']['actual']
 			status['targetBed'] = temps['bed']['target']
 
-		if self._printer.is_printing():
+		if self._printer.is_printing() or self._printer.is_paused():
 			data = self._printer.get_current_data()
+			self._logger.debug("get_current_data() is {}".format(repr(data)))
 			status["progress"] = str_safe_get(data, 'state', 'text')
 			status["progressDetail"] = "Printing Job: {} Percent Complete: {:0.1f}%".format(
-				str_safe_get(data, 'file', 'name'), str_safe_get(data, 'progress', 'completion'))
+				str_safe_get(data, 'file', 'name'), float_safe_get(data, 'progress', 'completion'))
 			status["estimatedTime"] = str_safe_get(data, "job", "estimatedPrintTime")
 			status["filamentUsed"] = str_safe_get(data, "job", "filament", "length")
 			status["printSeconds"] = str_safe_get(data, "progress", "printTime")
-			status["startTime"] = (datetime.datetime.now() - datetime.timedelta(seconds=int(status["printSeconds"]))).isoformat()
+			if status["printSeconds"]:
+				status["startTime"] = (datetime.datetime.now() -
+						datetime.timedelta(seconds=int(status["printSeconds"]))).isoformat()
 			status["bytesRead"] = str_safe_get(data, "progress", "filepos")
 			status["fileSize"] = str_safe_get(data, "job", "file", "size")
 		return status
@@ -321,8 +361,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 			while self._connected:
 				try:
+					self._status_now = False
 					if self._serial:
 						status = self._current_status()
+						self._logger.debug("emit status: {}".format(repr(status)))
 						self._socket.emit("status", status)
 						status_sent += 1
 
@@ -339,22 +381,25 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					# _update_interval can more quickly change when we start
 					# printing and so we get around to queued tasks
 					for i in range(self._update_interval):
-						try:
-							task = self._task_queue.get_nowait()
-							task()
-						except Queue.Empty:
-							pass
+						if not self._task_queue.empty():
+							try:
+								task = self._task_queue.get_nowait()
+								task()
+							except Queue.Empty:
+								pass
+						if self._status_now:
+							break
 						self._socket.wait(seconds=1)
 						if not self._connected:
 							self._serial = None
 							break
 
-					if self._serial:
+					if not self._status_now and self._serial:
 						self._upload_snapshot()
 
-				except Exception as e:
-					import traceback
-					self._logger.warn("polar_status exception: {}".format(traceback.format_exc()))
+				except:
+					self._logger.exception("polar_heartbeat exception")
+					sleep(5)
 
 			self._logger.info("Socket disconnected, clear and restart")
 			self._socket = None
@@ -396,15 +441,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			r.raise_for_status()
 		except Exception as e:
 			self._logger.exception("Could not capture image from {}".format(self._snapshot_url))
+			return
 
 		try:
 			image_bytes = r.content
 			if len(image_bytes) > self._max_image_size:
-				buf = StringIO.StringIO()
+				buf = StringIO()
 				buf.write(image_bytes)
 				image = Image.open(buf)
 				image.thumbnail((640, 480))
-				image_bytes = StringIO.StringIO()
+				image_bytes = StringIO()
 				image.save(image_bytes, format="jpeg")
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('image.jpg', image_bytes)})
 			p.raise_for_status()
@@ -480,6 +526,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if 'serialNumber' in response:
 			self._serial = response['serialNumber']
 			self._settings.set(['serial'], self._serial)
+			self._status_now = True
 			self._plugin_manager.send_plugin_message(self._identifier, {
 				'command': 'serial',
 				'serial': response['serialNumber']
@@ -527,6 +574,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._valid_packet(data):
 			return
 		self._printer.cancel_print()
+		self._status_now = True
 
 	#~~ command
 
@@ -534,6 +582,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._valid_packet(data):
 			return
 		self._printer.commands(data.get("command", ""))
+		self._status_now = True
+		# TODO commandResponse?
 
 	#~~ pause
 
@@ -542,13 +592,86 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 		# TODO data['type'] = filament, cold, pause
 		self._printer.pause_print()
+		self._status_now = True
 
 	#~~ print
 
 	def _on_print(self, data, *args, **kwargs):
 		if not self._valid_packet(data):
 			return
-		# TODO cloud print
+		if self._printer.is_printing() or self._printer.is_paused():
+			self._logger.warn("PolarCloud sent print command, but OctoPrint is already printing.")
+			return
+
+		self._job_id = "123"
+		if not 'stlFile' in data:
+			self._logger.warn("PolarCloud sent print command without stl file path.")
+			return
+
+		info = {}
+		gcode = (".gcode" in data['stlFile'].lower())
+		pos = (0, 0)
+		if not gcode:
+			if not 'configFile' in data:
+				self._logger.warn("PolarCloud sent print command without slicing profile.")
+				return
+			info['config'] = data['configFile']
+			try:
+				req_ini = requests.get(data['configFile'], timeout=5)
+				req_ini.raise_for_status()
+			except Exception as e:
+				self._logger.exception("Could not retrieve slicer config file from PolarCloud: {}".format(data['configFile']))
+				return
+			(slicing_profile, pos) = self._create_slicing_profile(req_ini.content)
+			if not slicing_profile:
+				self._logger.warn("Unable to create slicing profile. Aborting slice and print.")
+				return
+
+		# TODO: use tornado async I/O to get the print file?
+		try:
+			info['file'] = data['stlFile']
+			req_stl = requests.get(data['stlFile'], timeout=5)
+			req_stl.raise_for_status()
+		except Exception as e:
+			self._logger.exception("Could not retrieve print file from PolarCloud: {}".format(data['stlFile']))
+			return
+
+		path = self._file_manager.add_folder(FileDestinations.LOCAL, "polarcloud")
+		path = self._file_manager.join_path(FileDestinations.LOCAL, path, "current-print")
+		pathGcode = path + ".gcode"
+		path = path + (".gcode" if gcode else ".stl")
+		self._file_manager.add_file(FileDestinations.LOCAL, path, StreamWrapper(path, io.BytesIO(req_stl.content)), allow_overwrite=True)
+		job_id = data['jobID'] if 'jobID' in data else "123"
+
+		if self._printer.is_closed_or_error():
+			self._printer.disconnect()
+			self._printer.connect()
+
+		self._cloud_print = True
+		self._job_pending = True
+		self._job_id = job_id
+		self._pstate_counter = 0
+		self._pstate = self.PSTATE_PREPARING
+		self._cloud_print_info = info
+		self._status_now = True
+
+		if not gcode:
+			self._file_manager.slice('cura',
+					FileDestinations.LOCAL, path,
+					FileDestinations.LOCAL, pathGcode,
+					position=pos, profile="PolarCloud",
+					callback=self._on_slicing_complete,
+					callback_args=(self._file_manager.path_on_disk(FileDestinations.LOCAL, pathGcode),))
+		else:
+			self._on_slicing_complete(path)
+
+	def _on_slicing_complete(self, path, *args, **kwargs):
+		# TODO store self._cloud_print_info[sliceDetails]
+		self._logger.debug("_on_slicing_complete")
+		self._pstate = self.PSTATE_PRINTING
+		self._printer.select_file(path, False, printAfterSelect=True)
+		self._update_interval = 10
+		self._status_now = True
 
 	#~~ resume
 
@@ -556,6 +679,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._valid_packet(data):
 			return
 		self._printer.resume_print()
+		self._status_now = True
 
 	#~~ temperature
 
@@ -566,6 +690,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if re.match("(?bed)|(?tool[0-9]+)", key):
 				self._logger.debug("set_temperature {} to {}", key, data['key'])
 				self._printer.set_temperature(key, data['key'])
+		self._status_now = True
 
 	#~~ update
 
@@ -593,8 +718,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if softwareupdate:
 				version_info = softwareupdate.get_current_versions(['octoprint'])[0]['octoprint']
 				self._logger.debug("version_info: {}".format(repr(version_info)))
-				running_version = version_info['displayVersion']
-				latest_version = version_info['information']['remote']['value']
+				running_version = version_info['information']['local']['name']
+				latest_version = version_info['information']['remote']['name']
 		except:
 			self._logger.exception("Couldn't get softwareupdate plugin information")
 			return
@@ -620,17 +745,37 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'jobId': job_id,
 				'state': state
 			})
-		pass
+		self._status_now = True
 
 	#~~ EventHandlerPlugin mixin
 
 	def on_event(self, event, payload):
-		if event == Events.PRINT_CANCELLED:
+		if event == Events.PRINT_CANCELLED or event == Events.PRINT_FAILED:
+			self._pstate = self.PSTATE_CANCELLING
 			if self._cloud_print:
-				self._pstate = self.PSTATE_CANCELLING
 				self._pstate_counter = 3
-		if event == Events.PRINT_STARTED or event == Events.PRINT_RESUMED:
+		elif event == Events.PRINT_STARTED or event == Events.PRINT_RESUMED:
+			self._pstate = self.PSTATE_PRINTING
 			self._update_interval = 10
+			self._logger.debug("Update interval to {}".format(self._update_interval))
+		elif event == Events.ERROR:
+			self._pstate = self.PSTATE_ERROR
+		elif event == Events.PRINT_PAUSED:
+			self._pstate = self.PSTATE_PAUSED
+		elif event == Events.PRINT_DONE:
+			self._pstate = self.PSTATE_COMPLETE
+			if self._cloud_print:
+				self._pstate_counter = 3
+		elif event == Events.SLICING_CANCELLED or event == Events.SLICING_FAILED:
+			self._pstate = self.PSTATE_CANCELLING
+			self._pstate_counter = 3
+		else:
+			return
+
+		self._status_now = True
+		if self._job_pending and not self._printer.is_printing() and not self._printer.is_paused() and self._pstate != self.PSTATE_PREPARING:
+			self._job_pending = False
+			self._job(self._job_id, "completed" if event == Events.PRINT_DONE else "canceled")
 
 	#~~ SimpleApiPlugin mixin
 
@@ -655,6 +800,167 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		else:
 			message = "Unable to understand command"
 		return flask.jsonify({'status': status, 'message': message})
+
+	#~~ Slicing profile
+	def _create_slicing_profile(self, config_file_bytes):
+
+		class ConfigFileReader(StringIO, object):
+			def __init__(self, *args, **kwargs):
+				self._dummy_section = True
+				self._indent = False
+				return super(ConfigFileReader, self).__init__(*args, **kwargs)
+
+			def readline(self):
+				if self._dummy_section:
+					self._dummy_section = False
+					return "[x]"
+				line = super(ConfigFileReader, self).readline()
+				if self._indent:
+					line = "    " + line
+				if '"""' in line:
+					self._indent = not self._indent
+				return line
+
+
+		def config_file_generator(fp):
+			# prepend a dummy section header (x)
+			# indent multi-line strings (in triple quotes)
+			indent = False
+			line = "[x]"
+			while line:
+				if indent:
+					line = "    " + line
+				if '"""' in line:
+					indent = not not indent
+				yield line
+				line = fp.readline()
+
+		# create an in memory "file" of the profile and prepend a dummy section
+		# header so ConfigParser won't give up so easily
+		config_file = ConfigFileReader(config_file_bytes)
+
+		import ConfigParser
+		config = ConfigParser.ConfigParser()
+		try:
+			config.readfp(config_file)
+		except:
+			self._logger.exception("Error while reading PolarCloud slicing configuration.")
+			return None
+
+		printer_profile = self._printer_profile_manager.get_current_or_default()
+		extrusion_width = printer_profile["extruder"]["nozzleDiameter"]
+		if "extrusionWidth" in config.options("x"):
+			extrusion_width = config.get("x", "extrusionWidth")
+		layer_height = 0.2
+		if "layerThickness" in config.options("x"):
+			layer_height = config.get("x", "layerThickness")
+		init_layer_height = layer_height
+		if "initialLayerThickness" in config.options("x"):
+			init_layer_height = config.get("x", "initialLayerThickness")
+
+		posx = 0
+		posy = 0
+		mm_from_um = lambda x: x / 1000.0
+		no_translation = lambda x: x
+		width_from_line_count = lambda x: x * extrusion_width
+		height_from_layer_count = lambda x: x * layer_height
+		bool_from_int = lambda x: not not x
+
+		# if key in ("filament_diameter", "print_temperature", "start_gcode", "end_gcode"):
+		profile_from_engine_config = {
+			"layerthickness":       ("layer_height",       mm_from_um),
+			"printspeed":           ("print_speed",        no_translation),
+			"supporttype":          ("support_type",       lambda x: "lines" if x == 0 else "grid"),
+			"infillspeed":          ("infill_speed",       no_translation),
+			"infilloverlap":        ("fill_overlap",       no_translation),
+			"filamentdiameter":     ("filament_diameter",  lambda x: [mm_from_um(x)]),
+			"filamentflow":         ("filament_flow",      no_translation),
+			"retractionamountextruderswitch": ("retraction_dual_amount", mm_from_um),
+			"retractionamount":     ("retraction_amount",  mm_from_um),
+			"retractionspeed":      ("retraction_speed",   no_translation),
+			"initiallayerthickness":("bottom_thickness",   mm_from_um),
+			"extrusionwidth":       ("edge_width",         mm_from_um),
+			"insetcount":           ("wall_thickness",     width_from_line_count),
+			"downskincount":        ("solid_layer_thickness", height_from_layer_count),
+			"upskincount":          ("solid_layer_thickness", height_from_layer_count),
+			"initialspeeduplayers": (None, None),          # octoprint always uses 4
+			"initiallayerspeed":    ("bottom_layer_speed", no_translation),
+			"inset0speed":          ("outer_shell_speed",  no_translation),
+			"insetxspeed":          ("inner_shell_speed",  no_translation),
+			"movespeed":            ("travel_speed",       no_translation),
+			"minimallayertime":     ("cool_min_layer_time",no_translation),
+			"infillpattern":        (None, None),          # octoprint doesn't set
+			"layer0extrusionwidth": ("first_layer_width_factor", lambda x: x * 100.0 / extrusion_width),
+			"spiralizemode":        ("spiralize",          bool_from_int),
+			"supporteverywhere":    ("support",            lambda x: "everywhere" if x else "none") ,
+			"sparseinfilllinedistance": ("fill_density",   lambda x: 100.0 * extrusion_width / mm_from_um(x)),
+			"multivolumeoverlap":   ("overlap_dual",       mm_from_um),
+			"enableoozeshield":     ("ooze_shield",        bool_from_int),
+			"fanfullonlayernr":     ("fan_full_height",    lambda x: (x - 1) * layer_height + init_layer_height),
+			"gcodeflavor":          ("gcode_flavor",       lambda x: "reprap"), # TODO: GPX -> RepRap
+			"autocenter":           (None, None),          # octoprint doesn't set
+			"objectsink":           ("object_sink",        mm_from_um),
+			"extruderoffset[0].x":  (None, None),          # octoprint always overrides with printer profile
+			"extruderoffset[0].y":  (None, None),          # octoprint always overrides with printer profile
+			"retractionminimaldistance": ("retraction_min_travel", mm_from_um),
+			"retractionzhop":       ("retraction_hop",     mm_from_um),
+			"minimalextrusionbeforeretraction": ("rectraction_minimal_extrusion", mm_from_um),
+			"enablecombing":        ("retraction_combing", lambda x: "all" if x == 1 else ("no skin" if x == 2 else "off")),
+			"minimalfeedrate":      ("cool_min_feedrate",  no_translation),
+			"coolheadlift":         ("cool_head_lift",     bool_from_int),
+			"fanspeedmin":          ("fan_speed",          no_translation),
+			"fanspeedmax":          ("fan_speed_max",      no_translation),
+			"skirtdistance":        ("skirt_gap",          mm_from_um),
+			"skirtminlength":       ("skirt_minimal_length", mm_from_um),
+			"skirtlinecount":       ("skirt_line_count",   no_translation),
+			"supportangle":         ("support_angle",      no_translation),
+			"supportxydistance":    ("support_xy_distance", mm_from_um),
+			"supportzdistance":     ("support_z_distance", mm_from_um),
+			"supportlinedistance":  ("support_fill_rate",  lambda x: 100.0 * extrusion_width / mm_from_um(x)),
+			"startcode":            ("start.gcode",        lambda x: [x[3:-3]]),
+			"endcode":              ("end.gcode",          lambda x: [x[3:-3]])
+		}
+
+		profile = dict()
+		posx = 0
+		posy = 0
+		for option in config.options("x"):
+			# try to fetch the value in the correct type
+			try:
+				value = config.getint("x", option)
+			except:
+				# no int, try float
+				try:
+					value = config.getfloat("x", option)
+				except:
+					# no float, use str
+					value = config.get("x", option)
+
+			if option in profile_from_engine_config:
+				key, translate = profile_from_engine_config[option]
+				if key:
+					profile[key] = translate(value)
+				else:
+					self._logger.debug("Eating PolarCloud setting {}={}".format(option, value))
+			elif option == "fixHorrible":
+				profile["fix_horrible_union_all_type_a"] = not not (value & 0x01)
+				profile["fix_horrible_union_all_type_b"] = not not (value & 0x02)
+				profile["fix_horrible_extensive_stitching"] = not not (value & 0x04)
+				profile["fix_horrible_use_open_bits"] = not not (value & 0x10)
+			elif option == "posx":
+				posx = mm_from_um(value)
+			elif option == "posy":
+				posy = mm_from_um(value)
+			else:
+				self._logger.warn("PolarCloud slicing profile contains unrecognized setting {}={}".format(option, value))
+
+		self._logger.debug("Profile looks like this: {}".format(repr(profile)))
+		profile["fan_enabled"] = "fan_speed_max" in profile and profile["fan_speed_max"] > 0
+
+		profile = self._slicing_manager.save_profile("cura", "polarcloud", profile,
+				allow_overwrite=True, display_name="PolarCloud",
+				description="Slicing profile overwritten and used by each print started using Polar Cloud")
+		return (profile, (posx, posy))
 
 # If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py
 # ("OctoPrint-PluginSkeleton"), you may define that here. Same goes for the other metadata derived from setup.py that
