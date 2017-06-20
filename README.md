@@ -27,3 +27,11 @@ printer with your PolarCloud user account.
   settings
 * If you visit the Polar Cloud and click on the hamburger and choose
   "Printers", it should show your OctoPrint instance as one of your printers
+
+## Notes and Beta Limitations
+
+* Currently the Polar cloud cannot cause OctoPrint to reconnect with your
+  printer.  Therefore you'll want "Auto-connect on server startup" to be
+  checked in OctoPrint's Serial Settings. You'll also want to make sure the
+  correct port and baudrate are saved in settings.
+* The plugin does not yet upload timelapse movies to OctoPrint
