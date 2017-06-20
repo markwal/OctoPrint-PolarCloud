@@ -892,7 +892,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"movespeed":            ("travel_speed",       no_translation),
 			"minimallayertime":     ("cool_min_layer_time",no_translation),
 			"infillpattern":        (None, None),          # octoprint doesn't set
-			"layer0extrusionwidth": ("first_layer_width_factor", lambda x: x * 100.0 / extrusion_width),
+			"layer0extrusionwidth": ("first_layer_width_factor", lambda x: mm_from_um(x) * 100.0 / extrusion_width),
 			"spiralizemode":        ("spiralize",          bool_from_int),
 			"supporteverywhere":    ("support",            lambda x: "everywhere" if x else "none") ,
 			"sparseinfilllinedistance": ("fill_density",   lambda x: 100.0 * extrusion_width / mm_from_um(x)),
