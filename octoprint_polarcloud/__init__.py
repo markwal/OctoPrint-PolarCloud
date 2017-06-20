@@ -432,7 +432,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _upload_snapshot(self):
 		self._logger.debug("_upload_snapshot")
-		upload_type = 'idle' # TODO cloud print
+		upload_type = 'idle'
+		if self._cloud_print and (self._printer.is_printing() or self._printer.is_paused()):
+			upload_type = 'printing'
 		if not self._ensure_upload_url(upload_type):
 			return
 		try:
