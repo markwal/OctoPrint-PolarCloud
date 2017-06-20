@@ -546,6 +546,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		if not self._socket:
 			self._start_polar_status()
+			sleep(1) # give the thread a moment to start communicating
 		if not self._socket:
 			self._logger.info("Can't register because unable to communicate with Polar Cloud")
 			return False
@@ -873,7 +874,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"supporttype":          ("support_type",       lambda x: "lines" if x == 0 else "grid"),
 			"infillspeed":          ("infill_speed",       no_translation),
 			"infilloverlap":        ("fill_overlap",       no_translation),
-			"filamentdiameter":     ("filament_diameter",  lambda x: [mm_from_um(x)]),
+			"filamentdiameter":     ("filament_diameter",  lambda x: [mm_from_um(x) for i in range(4)]),
 			"filamentflow":         ("filament_flow",      no_translation),
 			"retractionamountextruderswitch": ("retraction_dual_amount", mm_from_um),
 			"retractionamount":     ("retraction_amount",  mm_from_um),
@@ -942,7 +943,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					profile[key] = translate(value)
 				else:
 					self._logger.debug("Eating PolarCloud setting {}={}".format(option, value))
-			elif option == "fixHorrible":
+			elif option == "fixhorrible":
 				profile["fix_horrible_union_all_type_a"] = not not (value & 0x01)
 				profile["fix_horrible_union_all_type_b"] = not not (value & 0x02)
 				profile["fix_horrible_extensive_stitching"] = not not (value & 0x04)
@@ -959,7 +960,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		profile = self._slicing_manager.save_profile("cura", "polarcloud", profile,
 				allow_overwrite=True, display_name="PolarCloud",
-				description="Slicing profile overwritten and used by each print started using Polar Cloud")
+				description="Polar Cloud sends this slicing profile down with each cloud print (overwritten each time)")
 		return (profile, (posx, posy))
 
 # If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py

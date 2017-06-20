@@ -23,8 +23,9 @@ printer with your PolarCloud user account.
   you can adjust things like print area and start/end gcode when setting up a print.
 * Click the Register Printer button and fill out your email address and PIN
   number (for your Polar3D account)
+* In the Beta, the first attempt may fail. Click OK once more.
 * In a few moments it should fill out the Serial number field in OctoPrint
-  settings
+  settings, be sure to press "Save" on the Settings box to save the Serial Number.
 * If you visit the Polar Cloud and click on the hamburger and choose
   "Printers", it should show your OctoPrint instance as one of your printers
 
