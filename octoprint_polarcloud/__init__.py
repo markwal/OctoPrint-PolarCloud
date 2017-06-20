@@ -917,7 +917,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"supportxydistance":    ("support_xy_distance", mm_from_um),
 			"supportzdistance":     ("support_z_distance", mm_from_um),
 			"supportlinedistance":  ("support_fill_rate",  lambda x: 100.0 * extrusion_width / mm_from_um(x)),
-			"startcode":            ("start_gcode",        lambda x: ["; ignore octoprint default temps T0:{print_temperature} bed:{print_bed_temperature}\n" + x[3:-3]]),
+			"startcode":            ("start_gcode",        lambda x: ["(ignore octoprint default temps T0:{print_temperature})\n(bed:{print_bed_temperature})\n" + x[3:-3]]),
 			"endcode":              ("end_gcode",          lambda x: [x[3:-3]])
 		}
 
