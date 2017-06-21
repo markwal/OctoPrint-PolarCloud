@@ -48,6 +48,13 @@
             <button class="btn" data-bind="click: showRegistration">{{ _('Register Printer') }}</button>
         </div>
     </div>
+    <div class="control-group">
+        <div class="controls">
+            <label class="checkbox">
+                <input type="checkbox" data-bind="checked: settings.verbose">{{ _('Verbose (debugging) logging') }}
+            </label>
+        </div>
+    </div>
     <div id="plugin_polarcloud_registration" class="modal hide fade">
         <div class="modal-header">
             <a href="#" class="close" data-dismiss="modal" aria-hidden="true">&times;</a>

@@ -79,7 +79,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
                        octoprint.plugin.AssetPlugin,
                        octoprint.plugin.TemplatePlugin,
                        octoprint.plugin.StartupPlugin,
-                       octoprint.plugin.SimpleApiPlugin):
+                       octoprint.plugin.SimpleApiPlugin,
+                       octoprint.plugin.EventHandlerPlugin):
 	PSTATE_IDLE = "0"
 	PSTATE_SERIAL = "1"         # Printing a local print over serial
 	PSTATE_PREPARING = "2"      # Preparing a cloud print (slicing)
@@ -116,17 +117,19 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	##~~ SettingsPlugin mixin
 
 	def get_settings_defaults(self, *args, **kwargs):
-		self._logger.info("get_settings_defaults")
 		return dict(
 			service="https://printer2.polar3d.com",
 			service_ui="https://polar3d.com",
 			serial=None,
 			printer_type=None,
 			email="",
-			max_image_size = 150000
+			max_image_size = 150000,
+			verbose=False
 		)
 
 	def _update_local_settings(self):
+		self._logger.setLevel(logging.DEBUG if self._settings.get(['verbose']) else logging.NOTSET)
+		self._logger.debug("_update_local_settings")
 		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
 		self._max_image_size = self._settings.get(['max_image_size'])
 		self._serial = self._settings.get(['serial'])
@@ -167,7 +170,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	##~~ StartupPlugin mixin
 
 	def on_after_startup(self, *args, **kwargs):
-		self._logger.setLevel(logging.DEBUG)
+		if self._settings.get(['verbose']):
+			self._logger.setLevel(logging.DEBUG)
 		self._logger.debug("on_after_startup")
 		self._get_keys()
 		self._update_local_settings()
@@ -379,7 +383,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						# reset update interval to slow if we're not printing anymore
 						# we do it here so we get one quick update when it changes
 						if not self._cloud_print and not self._printer.is_printing():
-							self._update_interval = 60
+							if self._update_interval < 60:
+								self._update_interval = 60
+							elif self._printer.is_error():
+								self._update_interval = 360
+							elif self._printer.is_closed_or_error():
+								# is_closed since !is_error
+								self._update_interval = 8 * 360
 
 					# wait for _update_interval seconds in 1 second chunks so that
 					# _update_interval can more quickly change when we start
@@ -437,8 +447,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _upload_snapshot(self):
 		self._logger.debug("_upload_snapshot")
 		upload_type = 'idle'
-		if self._cloud_print and (self._printer.is_printing() or self._printer.is_paused()):
+		if self._cloud_print and self._job_id != '123' and (self._printer.is_printing() or self._printer.is_paused()):
 			upload_type = 'printing'
+		self._logger.debug("upload_type {}".format(upload_type))
 		if not self._ensure_upload_url(upload_type):
 			return
 		try:
@@ -645,7 +656,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		pathGcode = path + ".gcode"
 		path = path + (".gcode" if gcode else ".stl")
 		self._file_manager.add_file(FileDestinations.LOCAL, path, StreamWrapper(path, io.BytesIO(req_stl.content)), allow_overwrite=True)
-		job_id = data['jobID'] if 'jobID' in data else "123"
+		job_id = data['jobId'] if 'jobId' in data else "123"
+		self._logger.debug("print jobId is {}".format(job_id))
+		self._logger.debug("print data is {}".format(repr(data)))
 
 		if self._printer.is_closed_or_error():
 			self._printer.disconnect()
@@ -754,6 +767,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ EventHandlerPlugin mixin
 
 	def on_event(self, event, payload):
+		self._logger.debug("on_event")
+		self._logger.debug("on_event: {}".format(repr(event)))
 		if event == Events.PRINT_CANCELLED or event == Events.PRINT_FAILED:
 			self._pstate = self.PSTATE_CANCELLING
 			if self._cloud_print:
