@@ -111,6 +111,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._pstate = self.PSTATE_IDLE # only applies if _cloud_print
 		self._pstate_counter = 0
 		self._max_image_size = 150000
+		self._printer_type = None
 
 	##~~ SettingsPlugin mixin
 
@@ -124,6 +125,11 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			email="",
 			max_image_size = 150000
 		)
+
+	def _update_local_settings(self):
+		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
+		self._max_image_size = self._settings.get(['max_image_size'])
+		self._serial = self._settings.get(['serial'])
 
 	##~~ AssetPlugin mixin
 
@@ -164,9 +170,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.setLevel(logging.DEBUG)
 		self._logger.debug("on_after_startup")
 		self._get_keys()
-		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-		self._max_image_size = self._settings.get(['max_image_size'])
-		self._serial = self._settings.get(['serial'])
+		self._update_local_settings()
 		if self._serial:
 			self._start_polar_status()
 
@@ -509,13 +513,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug('hello')
 		if self._serial and self._challenge:
 			self._logger.debug('emit hello')
+			self._printer_type = self._settings.get(["printer_type"])
 			self._socket.emit('hello', {
 				'serialNumber': self._serial,
 				'signature': base64.b64encode(crypto.sign(self.key, self._challenge, b'sha256')),
 				'MAC': get_mac(),
 				'localIP': get_ip(),
 				'protocol': '2',
-				'camUrl': self._settings.global_get(["webcam", "stream"])
+				'camUrl': self._settings.global_get(["webcam", "stream"]),
+				'printerType': self._printer_type
 			})
 			self._task_queue.put(self._ensure_idle_upload_url)
 		else:
@@ -562,11 +568,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"myInfo": {
 				"MAC": get_mac(),
 				"protocolVersion": "2"
-				# "rotateImg": 1,
-				# "camOff": 1,
-				# "printerType": "MakerBot Replicator 1 Dual",
-				# "serialNumber": "pb000103",
-				# "timestamp": ""
 			}
 		})
 		return True
@@ -772,6 +773,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		elif event == Events.SLICING_CANCELLED or event == Events.SLICING_FAILED:
 			self._pstate = self.PSTATE_CANCELLING
 			self._pstate_counter = 3
+		elif event == Events.SETTINGS_UPDATED:
+			self._update_local_settings()
+			if (self._printer_type != self._settings.get(['printer_type'])):
+				self._task_queue.put(self._hello)
 		else:
 			return
 
