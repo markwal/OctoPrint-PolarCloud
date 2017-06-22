@@ -11,6 +11,16 @@ install via the "From URL" box using this URL:
 
     https://github.com/markwal/OctoPrint-PolarCloud/archive/master.zip
 
+## Enable Polar Cloud timelapses
+
+To create timelapse movies in the format required by the Polar Cloud, the
+plugin uses GStreamer.  To install GStreamer and the necessary plugins, use the
+following command line:
+
+```
+sudo apt install gstreamer1.0-tools gstreamer1.0-plugins-good libx264-dev gstreamer1.0-plugins-ugly
+```
+
 ## Configuration
 
 After installing the plugin and restarting OctoPrint, you need to register your
