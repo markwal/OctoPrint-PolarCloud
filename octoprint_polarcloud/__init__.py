@@ -33,6 +33,7 @@ import datetime
 from time import sleep
 from StringIO import StringIO
 import io
+from urlparse import urlparse, urlunparse
 
 from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
@@ -58,6 +59,21 @@ def get_mac():
 # what's the likely ip address for the local UI?
 def get_ip():
 	return octoprint.util.address_for_client("google.com", 80)
+
+# take a server relative or localhost url and attempt to make absolute an absolute
+# url out of it  (guess about which interface)
+def normalize_url(url):
+	try:
+		urlp = urlparse(url)
+		scheme = urlp.scheme
+		if not scheme:
+			scheme = "http:"
+		host = urlp.netloc
+		if not host or host == '127.0.0.1' or host == 'localhost':
+			host = get_ip()
+		return urlunparse((scheme, host, urlp.path, urlp.params, urlp.query, urlp.fragment))
+	except:
+		self._logger.exception("Unable to canonicalize the url {}".format(url))
 
 # do a dictionary lookup and return an empty string for any missing key
 # rather than throw MissingKey
@@ -130,9 +146,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _update_local_settings(self):
 		self._logger.setLevel(logging.DEBUG if self._settings.get(['verbose']) else logging.NOTSET)
 		self._logger.debug("_update_local_settings")
-		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
 		self._max_image_size = self._settings.get(['max_image_size'])
 		self._serial = self._settings.get(['serial'])
+
+		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
+		if self._snapshot_url:
+			self._snapshot_url = normalize_url(self._snapshot_url)
 
 	##~~ AssetPlugin mixin
 
