@@ -9,7 +9,7 @@ license: AGPLv3
 
 date: 2017-06-25
 
-homepage: https://github.com/markwal/OctoPrint-PolarCloud
+homepage: https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md
 source: https://github.com/markwal/OctoPrint-PolarCloud
 archive: https://github.com/markwal/OctoPrint-PolarCloud/archive/master.zip
 
@@ -49,3 +49,13 @@ them all from one place.
 
 You can upload your objects to Polar Cloud, share them with other cloud
 members, and send them to your printer.
+
+## IFTTT
+
+Polar Cloud is an IFTTT service, so you can easily set things up to happen when
+various events happen with your printer connected to Polar Cloud.
+
+## Getting Started
+
+There's a few steps to get up and running (beyond installing the plugin).
+Please read the additional info in the [README](https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md)

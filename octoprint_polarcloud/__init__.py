@@ -811,6 +811,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._update_local_settings()
 			if (self._printer_type != self._settings.get(['printer_type'])):
 				self._task_queue.put(self._hello)
+		elif event == Events.PRINTER_STATE_CHANGED:
+			pass
 		else:
 			return
 
@@ -1003,9 +1005,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				description="Polar Cloud sends this slicing profile down with each cloud print (overwritten each time)")
 		return (profile, (posx, posy))
 
-# If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py
-# ("OctoPrint-PluginSkeleton"), you may define that here. Same goes for the other metadata derived from setup.py that
-# can be overwritten via __plugin_xyz__ control properties. See the documentation for that.
 __plugin_name__ = "PolarCloud"
 
 def __plugin_load__():
