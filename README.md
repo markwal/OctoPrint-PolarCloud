@@ -1,4 +1,4 @@
-# OctoPrint-PolarCloud
+# OctoPrint-PolarCloud (Beta)
 
 Connects OctoPrint to the PolarCloud so that you can easily monitor and control
 your printer from anywhere via https://polar3d.com
