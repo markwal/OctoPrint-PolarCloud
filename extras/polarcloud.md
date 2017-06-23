@@ -52,8 +52,9 @@ members, and send them to your printer.
 
 ## IFTTT
 
-Polar Cloud is an IFTTT service, so you can easily set things up to happen when
-various events happen with your printer connected to Polar Cloud.
+[Polar Cloud is an IFTTT service](https://ifttt.com/polar3d), so you can easily set
+things up to happen when various events happen with your printer connected to
+Polar Cloud.
 
 ## Getting Started
 
