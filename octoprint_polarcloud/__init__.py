@@ -110,6 +110,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	PSTATE_CHANGINGFILAMENT = "10"
 	PSTATE_TCPIP = "11"         # Printing a local print over TCP/IP
 	PSTATE_ERROR = "12"
+	PSTATE_OFFLINE = "13"
 
 	def __init__(self):
 		self._serial = None
@@ -238,6 +239,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('resume', self._on_resume)
 		self._socket.on('temperature', self._on_temperature)
 		self._socket.on('update', self._on_update)
+		self._socket.on('connectPrinter', self._on_connect_printer)
 
 	def _start_polar_status(self):
 		if not self._polar_status_worker:
@@ -277,7 +279,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"ERROR": self.PSTATE_ERROR,
 			"CLOSED_WITH_ERROR": self.PSTATE_ERROR,
 			"TRANSFERING_FILE": self.PSTATE_SERIAL,
-			"OFFLINE": self.PSTATE_ERROR,
+			"OFFLINE": self.PSTATE_OFFLINE,
 			"UNKNOWN": self.PSTATE_ERROR,
 			"NONE": self.PSTATE_ERROR
 		}
@@ -783,10 +785,22 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			})
 		self._status_now = True
 
+	#~~ connectPrinter
+
+	def _on_connect_printer(self):
+		self._logger.debug("connectPrinter")
+		if self._printer.is_closed_or_error():
+			self._logger.info("Attempting to reconnect to the printer")
+			try:
+				self._printer.disconnect()
+				self._printer.connect()
+			except:
+				self._logger.exception("Unable to reconnect to the printer")
+		self._status_now = True
+
 	#~~ EventHandlerPlugin mixin
 
 	def on_event(self, event, payload):
-		self._logger.debug("on_event")
 		self._logger.debug("on_event: {}".format(repr(event)))
 		if event == Events.PRINT_CANCELLED or event == Events.PRINT_FAILED:
 			self._pstate = self.PSTATE_CANCELLING
