@@ -1,7 +1,7 @@
 ## The Polar Cloud
 
-With the [Polar Cloud](https://polar3d.com) you can securely control your printer remotely!
-(But please do be safety conscious!)
+With the [Polar Cloud](https://polar3d.com) you can securely control your printer remotely!  
+(But please do be safety conscious.)
 
 The Polar Cloud provides you with secure access to your printer from anywhere in the world, using any WebGL-capable web browser. The Polar Cloud is even tablet and phone friendly. Chromebooks and even the newest, inexpensive Amazon Fire tablets are supported.
 
