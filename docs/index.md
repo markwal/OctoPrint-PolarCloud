@@ -20,11 +20,11 @@ If you do not have an account with Google, Facebook, or Microsoft, you will firs
 When you have an account with Google, Facebook, or Microsoft Live, you're ready to log in to the Polar Cloud. Just
 navigate to
 
-    [https://polar3d.com](https://polar3d.com)
+> [https://polar3d.com](https://polar3d.com)
 
 You'll be presented with a login screen with three login buttons, one for each of the providers. Click the appropriate one and login.
 
-![](images/login.png)
+![login-screen](images/login.png)
 
 Your Polar Cloud account will automatically be created for you.
 
