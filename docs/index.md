@@ -20,7 +20,7 @@ If you do not have an account with Google, Facebook, or Microsoft, you will firs
 When you have an account with Google, Facebook, or Microsoft Live, you're ready to log in to the Polar Cloud. Just
 navigate to
 
-> [https://polar3d.com](https://polar3d.com)
+    [https://polar3d.com](https://polar3d.com)
 
 You'll be presented with a login screen with three login buttons, one for each of the providers. Click the appropriate one and login.
 
@@ -61,7 +61,7 @@ At the objects page, click the UPLOAD button near the upper right,
 With the resulting upload dialog you can upload one or more STL files. They will be saved to a private object of your own and you will be given the choice of viewing the object or going to the printer's virtual build plate. Choose going to the build plate.
 
 > Note that if you logged in using Google, you can choose to load files from Google Drive. Further, when at Google Drive, you can send STL files directly to your printer's virtual build plate by right-clicking on a STL file, selecting "Open with", and then choosing "Polar Cloud".
-> 
+
 > Note uploaded STL files and the objects created to hold them always begin as private regardless of which tab of the objects page you are on. You must explicitly decide to share them or mark them as public in order for other people to access them. Objects can be shared with individual members or groups. Or they can be marked as public in which case any cloud member may access them.
 
 ## Printer Configuration
