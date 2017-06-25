@@ -3,6 +3,18 @@
 Connects OctoPrint to the PolarCloud so that you can easily monitor and control
 your printer from anywhere via https://polar3d.com
 
+## Prereq
+
+Apparently there is a problem with either pyOpenSSL or pip (#1) on some
+people's octopi.  I haven't figured out the correct solution to this yet, but
+in the meantime, updating and manually installing pyOpenSSL may help:
+
+```
+sudo apt-get update
+source ~/oprint/bin/activate
+pip install pyOpenSSL
+```
+
 ## Setup
 
 Install via OctoPrint's [Plugin Manager](https://github.com/foosel/OctoPrint/wiki/Plugin:-Plugin-Manager)
