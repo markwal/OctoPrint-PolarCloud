@@ -846,7 +846,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		return True
 
 	def on_api_command(self, command, data):
-		self._logger.info('on_api_command {}'.format(repr(data)))
 		status='FAIL'
 		message=''
 		if command == 'register' and 'email' in data and 'pin' in data:

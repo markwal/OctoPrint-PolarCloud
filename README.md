@@ -5,14 +5,15 @@ your printer from anywhere via https://polar3d.com
 
 ## Prereq
 
-Apparently there is a problem with either pyOpenSSL or pip (#1) on some
-people's octopi.  I haven't figured out the correct solution to this yet, but
-in the meantime, updating and manually installing pyOpenSSL may help:
+There's an incompatibility between the pip and pyOpenSSL that will often cause
+problems with installing this plugin.  The following steps downgrade pip to a
+version that can more reliably install pyOpenSSL.  Unfortunately, it'll also
+give you that pip warning whenever you install a plugin (but is ignorable).
 
 ```
-sudo apt-get update
 source ~/oprint/bin/activate
-pip install pyOpenSSL
+pip install --upgrade "pip>=8,<9"
+pip install --upgrade pyOpenSSL
 ```
 
 ## Setup
