@@ -484,12 +484,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		try:
 			image_bytes = r.content
 			if len(image_bytes) > self._max_image_size:
+				self._logger.debug("Recompressing snapshot to smaller size")
 				buf = StringIO()
 				buf.write(image_bytes)
 				image = Image.open(buf)
 				image.thumbnail((640, 480))
 				image_bytes = StringIO()
 				image.save(image_bytes, format="jpeg")
+			if len(image_bytes) == 0:
+				self._logger.debug("Unable to retrieve valid image, not uploading to PolarCloud")
+				return
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('image.jpg', image_bytes)})
 			p.raise_for_status()
 			self._logger.debug("{}: {}".format(p.status_code, p.content))
