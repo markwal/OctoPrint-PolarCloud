@@ -835,7 +835,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._update_local_settings()
 			if (self._printer_type != self._settings.get(['printer_type'])):
 				self._task_queue.put(self._hello)
-		elif event == Events.PRINTER_STATE_CHANGED:
+		elif hasattr(Events, PRINTER_STATE_CHANGED) and event == Events.PRINTER_STATE_CHANGED:
 			pass
 		else:
 			return
