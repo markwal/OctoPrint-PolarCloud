@@ -11,13 +11,14 @@ version that can more reliably install pyOpenSSL.  Unfortunately, it'll also
 give you that pip warning whenever you install a plugin (but is ignorable).
 
 ## ** IMPORTANT **
-Be careful with the "rm -rf" line. It deletes everything it touches all the
-way down. Be sure you've typed out the part with pyOpenSSL and don't put any
-accidental spaces in it
+Be careful with the "rm -rf" lines. It deletes everything it touches all the
+way down. Be sure you've typed out the part with OpenSSL or pyOpenSSL and don't
+put any accidental spaces in it
 
 ```
 source ~/oprint/bin/activate
 pip install --upgrade "pip>=8,<9"
+rm -rf ~/oprint/lib/python2.7/site-packages/OpenSSL*
 rm -rf ~/oprint/lib/python2.7/site-packages/pyOpenSSL*
 pip install --upgrade pyOpenSSL
 pip install --upgrade pyOpenSSL
