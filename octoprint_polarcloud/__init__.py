@@ -483,13 +483,23 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		try:
 			image_bytes = r.content
-			if len(image_bytes) > self._max_image_size:
+			image_size = len(image_bytes)
+			if image_size > self._max_image_size:
+				self._logger.debug("Recompressing snapshot to smaller size")
 				buf = StringIO()
 				buf.write(image_bytes)
 				image = Image.open(buf)
 				image.thumbnail((640, 480))
 				image_bytes = StringIO()
 				image.save(image_bytes, format="jpeg")
+				image_bytes.seek(0, 2)
+				new_image_size = image_bytes.tell()
+				image_bytes.seek(0)
+				self._logger.debug("Image transcoded from size {} to {}".format(image_size, new_image_size))
+				image_size = new_image_size
+			if image_size == 0:
+				self._logger.debug("Image content is length 0 from {}, not uploading to PolarCloud".format(self._snapshot_url))
+				return
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('image.jpg', image_bytes)})
 			p.raise_for_status()
 			self._logger.debug("{}: {}".format(p.status_code, p.content))
@@ -846,7 +856,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		return True
 
 	def on_api_command(self, command, data):
-		self._logger.info('on_api_command {}'.format(repr(data)))
 		status='FAIL'
 		message=''
 		if command == 'register' and 'email' in data and 'pin' in data:
