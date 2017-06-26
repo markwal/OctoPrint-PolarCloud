@@ -36,6 +36,8 @@ Once logged in you should see the home page,
 
 On the home page, click your profile image in the upper right corner and select the "Settings" menu item. This will take you to your account settings page where you can see (and change) your account's PIN number. It is located near the bottom of the settings page. You will need that PIN number when registering your Octoprint server with the Polar Cloud.
 
+> Should you decide to change your PIN, **remember to click the SAVE button** near the upper right of the account settings page.   It will even turn red to indicate the need to save any changed settings.  However, it's easy to miss seeing that button as it may have scrolled off the top of the page when you accessed the PIN field.
+
 > To register an Octoprint server with the Polar Cloud, you will supply Octoprint with the e-mail address associated with your Polar Cloud account as well as your PIN number. Octoprint will connect to the cloud using SSL/TLS and provide your account information as well as a public RSA crypto key it has generated. Once your account is validated by the cloud, a unique serial number will be sent back to Octoprint. Then each time Octoprint connects to the cloud, it will authenticate itself through use of its private RSA crypto key.
 
 ## Loading a STL file to your account
