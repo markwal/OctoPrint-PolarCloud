@@ -34,6 +34,7 @@ from time import sleep
 from StringIO import StringIO
 import io
 from urlparse import urlparse, urlunparse
+import random
 
 from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
@@ -366,6 +367,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _polar_status_heartbeat(self):
 		try:
 			self._logger.debug("heartbeat")
+			random.seed()
 			next_check_versions = datetime.datetime.now() 
 			status_sent = 0
 			self._create_socket()
@@ -382,8 +384,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					pass
 				self._socket.wait(seconds=10)
 			else:
-				self._logger.warn("unable to create socket to Polar Cloud, check again in {} seconds".format(self._update_interval))
-				sleep(self._update_interval)
+				reconnection_delay = random.uniform(1.5, 3)
+				self._logger.warn("unable to create socket to Polar Cloud, check again in {} seconds".format(reconnection_delay))
+				sleep(reconnection_delay)
 				self._create_socket()
 
 			if not self._socket:
@@ -405,13 +408,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						# reset update interval to slow if we're not printing anymore
 						# we do it here so we get one quick update when it changes
 						if not self._cloud_print and not self._printer.is_printing():
-							if self._update_interval < 60:
-								self._update_interval = 60
-							elif self._printer.is_error():
-								self._update_interval = 360
-							elif self._printer.is_closed_or_error():
-								# is_closed since !is_error
-								self._update_interval = 8 * 360
+							self._update_interval = 60
 
 					# wait for _update_interval seconds in 1 second chunks so that
 					# _update_interval can more quickly change when we start
