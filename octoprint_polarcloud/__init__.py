@@ -134,6 +134,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._max_image_size = 150000
 		self._printer_type = None
 		self._disconnect_on_register = False
+		self._hello_attempted = False
 
 	##~~ SettingsPlugin mixin
 
@@ -225,6 +226,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		# Create socket and set up event handlers
 		try:
 			self._connected = True
+			self._hello_attempted = False
 			self._socket = SocketIO(self._settings.get(['service']), Namespace=LoggingNamespace, verify=True, wait_for_connection=False)
 		except (TimeoutError, ConnectionError, StopIteration):
 			self._socket = None
@@ -353,7 +355,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _current_status(self):
 		temps = self._printer.get_current_temperatures()
-		self._logger.debug("{}".format(temps))
+		self._logger.debug("{}".format(repr(temps)))
 		status = {
 			"serialNumber": self._serial,
 			"status": self._polar_status_from_state(),
@@ -430,7 +432,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			while self._connected:
 				try:
 					self._status_now = False
-					if self._serial:
+					if self._serial and self._hello_attempted:
 						status = self._current_status()
 						self._logger.debug("emit status: {}".format(repr(status)))
 						self._socket.emit("status", status)
@@ -456,6 +458,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 							except Queue.Empty:
 								pass
 						if self._status_now:
+							self._logger.debug("_status_now break")
 							break
 						self._socket.wait(seconds=1)
 						if not self._connected:
@@ -584,6 +587,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _hello(self):
 		self._logger.debug('hello')
+		self._hello_attempted = True
 		if self._serial and self._challenge:
 			self._logger.debug('emit hello')
 			self._printer_type = self._settings.get(["printer_type"])
@@ -869,6 +873,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._update_local_settings()
 			if (self._printer_type != self._settings.get(['printer_type'])):
 				self._task_queue.put(self._hello)
+		elif hasattr(Events, 'PRINTER_STATE_CHANGED') and event == Events.PRINTER_STATE_CHANGED:
+			self._status_now = True
+			return
 		else:
 			return
 
