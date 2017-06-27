@@ -831,7 +831,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	#~~ connectPrinter
 
-	def _on_connect_printer(self):
+	def _on_connect_printer(self, data, *args, **kwargs):
 		self._logger.debug("connectPrinter")
 		if self._printer.is_closed_or_error():
 			self._logger.info("Attempting to reconnect to the printer")
@@ -869,14 +869,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._update_local_settings()
 			if (self._printer_type != self._settings.get(['printer_type'])):
 				self._task_queue.put(self._hello)
-		elif hasattr(Events, 'PRINTER_STATE_CHANGED') and event == Events.PRINTER_STATE_CHANGED:
-			pass
 		else:
 			return
 
 		self._status_now = True
 		if self._job_pending and not self._printer.is_printing() and not self._printer.is_paused() and self._pstate != self.PSTATE_PREPARING:
 			self._job_pending = False
+			self._logger.debug("emitting job due to event: {}".format(event))
 			self._job(self._job_id, "completed" if event == Events.PRINT_DONE else "canceled")
 
 	#~~ SimpleApiPlugin mixin
