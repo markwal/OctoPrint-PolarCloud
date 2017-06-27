@@ -50,3 +50,11 @@ printer with your PolarCloud user account.
   checked in OctoPrint's Serial Settings. You'll also want to make sure the
   correct port and baudrate are saved in settings.
 * The plugin does not yet upload timelapse movies to OctoPrint
+
+## Note for Users running OctoPrint on Windows
+
+If you've got an old version of pyopenssl installed into the OctoPrint
+environment and you don't have ssh-keygen on your path, this plugin won't be
+able to register your printer with Polar Cloud. You'll get something about
+'ssh-keygen' not found in octoprint.log.  You can fix this by updating
+pyOpenSSL and restarting OctoPrint.
