@@ -24,6 +24,8 @@ __copyright__ = "Copyright (C) 2017 Mark Walker"
 """
 
 import os
+import sys
+import stat
 import threading
 import logging
 import uuid
@@ -68,7 +70,7 @@ def normalize_url(url):
 		urlp = urlparse(url)
 		scheme = urlp.scheme
 		if not scheme:
-			scheme = "http:"
+			scheme = "http"
 		host = urlp.netloc
 		if not host or host == '127.0.0.1' or host == 'localhost':
 			host = get_ip()
@@ -131,6 +133,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._pstate_counter = 0
 		self._max_image_size = 150000
 		self._printer_type = None
+		self._disconnect_on_register = False
 
 	##~~ SettingsPlugin mixin
 
@@ -249,6 +252,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._polar_status_worker.daemon = True
 			self._polar_status_worker.start()
 
+	def _system(self, command_line):
+		try:
+			p = sarge.run(command_line, stderr=sarge.Capture())
+			return (p.returncode, p.stderr.text)
+		except:
+			self._logger.exception("Failed to run system command: {}".format(command_line))
+			return (1, "")
+
+
 	def _get_keys(self):
 		data_folder = self.get_plugin_data_folder()
 		key_filename = os.path.join(data_folder, 'p3d_key')
@@ -259,6 +271,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			key.generate_key(crypto.TYPE_RSA, 2048)
 			with open(key_filename, 'w') as f:
 				f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
+			if sys.platform != 'win32':
+				os.chmod(key_filename, stat.S_IRUSR | stat.S_IWUSR)
 		try:
 			with open(key_filename) as f:
 				key = f.read()
@@ -273,14 +287,17 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		else:
 			pubkey_filename = key_filename + ".pub"
 			if not os.path.isfile(pubkey_filename):
-				try:
-					p = sarge.run("ssh-keygen -e -m PEM -f {key_filename} > {pubkey_filename}".format(key_filename=key_filename, pubkey_filename=pubkey_filename),
-							stderr=sarge.Capture())
-					if p.returncode != 0:
-						self._logger.error("Unable to generate public key (may need to manually upgrade pyOpenSSL, see README) {}: {}".format(p.returncode, p.stderr))
-						return
-				except:
-					self._logger.exception("Unable to generate public key (may need to manually upgrade pyOpenSSL, see README)")
+				if sys.platform != 'win32':
+					os.chmod(key_filename, stat.S_IRUSR | stat.S_IWUSR)
+				command_line = "ssh-keygen -e -m PEM -f {key_filename} > {pubkey_filename}".format(key_filename=key_filename, pubkey_filename=pubkey_filename)
+				returncode, stderr_text = self._system(command_line)
+				if returncode != 0:
+					self._logger.error("Unable to generate public key (may need to manually upgrade pyOpenSSL, see README) {}: {}".format(returncode, stderr_text))
+					self._key = None
+					try:
+						os.remove(pubkey_filename)
+					except OSError:
+						pass
 					return
 			with open(pubkey_filename) as f:
 				self._public_key = f.read()
@@ -442,11 +459,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 							break
 						self._socket.wait(seconds=1)
 						if not self._connected:
-							self._serial = None
 							break
-
-					if not self._status_now and self._serial:
-						self._upload_snapshot()
+					else:
+						if self._serial:
+							self._upload_snapshot()
 
 				except:
 					self._logger.exception("polar_heartbeat exception")
@@ -454,7 +470,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 			self._logger.info("Socket disconnected, clear and restart")
 			self._socket = None
-			if status_sent < 3:
+			if status_sent < 3 and not self._disconnect_on_register:
 				self._logger.warn("Unable to connect to Polar Cloud")
 				break
 			self._logger.debug("bottom of forever")
@@ -571,13 +587,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if self._serial and self._challenge:
 			self._logger.debug('emit hello')
 			self._printer_type = self._settings.get(["printer_type"])
+			camUrl = normalize_url(self._settings.global_get(["webcam", "stream"]))
+			self._logger.debug("camUrl: {}".format(camUrl))
 			self._socket.emit('hello', {
 				'serialNumber': self._serial,
 				'signature': base64.b64encode(crypto.sign(self._key, self._challenge, b'sha256')),
 				'MAC': get_mac(),
 				'localIP': get_ip(),
 				'protocol': '2',
-				'camUrl': normalize_url(self._settings.global_get(["webcam", "stream"])),
+				'camUrl': camUrl,
 				'printerType': self._printer_type
 			})
 			self._task_queue.put(self._ensure_idle_upload_url)
@@ -596,6 +614,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'command': 'serial',
 				'serial': self._serial
 			})
+			self._disconnect_on_register = True
 			self._socket.disconnect()
 		else:
 			self._plugin_manager.send_plugin_message(self._identifier, {
