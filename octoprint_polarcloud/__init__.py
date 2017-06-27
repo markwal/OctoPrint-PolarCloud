@@ -286,7 +286,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._public_key = crypto.dump_publickey(crypto.FILETYPE_PEM, self._key)
 		else:
 			pubkey_filename = key_filename + ".pub"
-			if not os.path.isfile(pubkey_filename):
+			if not os.path.isfile(pubkey_filename) or os.path.getsize(pubkey_filename) == 0:
 				if sys.platform != 'win32':
 					os.chmod(key_filename, stat.S_IRUSR | stat.S_IWUSR)
 				command_line = "ssh-keygen -e -m PEM -f {key_filename} > {pubkey_filename}".format(key_filename=key_filename, pubkey_filename=pubkey_filename)
