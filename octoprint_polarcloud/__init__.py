@@ -576,10 +576,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._status_now = True
 			self._plugin_manager.send_plugin_message(self._identifier, {
 				'command': 'serial',
-				'serial': response['serialNumber']
+				'serial': self._serial
 			})
-			if self._challenge:
-				self._task_queue.put(self._hello)
+			self._socket.disconnect()
 		else:
 			self._plugin_manager.send_plugin_message(self._identifier, {
 				'command': 'registration_failed'
