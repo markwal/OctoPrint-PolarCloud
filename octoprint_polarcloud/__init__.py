@@ -152,7 +152,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
 		if self._snapshot_url:
-			self._snapshot_url = normalize_url(self._snapshot_url)
+			self._snapshot_url = self._snapshot_url
 
 	##~~ AssetPlugin mixin
 
@@ -294,6 +294,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._cloud_print = False
 			return self._pstate
 
+		self._logger.debug("OctoPrint state: {}".format(self._printer.get_state_id()))
 		state = state_mapping[self._printer.get_state_id()]
 
 		if state == self.PSTATE_SERIAL:
@@ -441,7 +442,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if status_sent < 3:
 				self._logger.warn("Unable to connect to Polar Cloud")
 				break
-			status_sent = 0
 			self._logger.debug("bottom of forever")
 
 	def _on_disconnect(self):
@@ -562,7 +562,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'MAC': get_mac(),
 				'localIP': get_ip(),
 				'protocol': '2',
-				'camUrl': self._settings.global_get(["webcam", "stream"]),
+				'camUrl': normalize_url(self._settings.global_get(["webcam", "stream"])),
 				'printerType': self._printer_type
 			})
 			self._task_queue.put(self._ensure_idle_upload_url)
@@ -597,6 +597,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._socket:
 			self._start_polar_status()
 			sleep(1) # give the thread a moment to start communicating
+			self._logger.debug("Do we have a socket: {}".format(repr(self._socket)))
 		if not self._socket:
 			self._logger.info("Can't register because unable to communicate with Polar Cloud")
 			return False
