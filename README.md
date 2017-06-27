@@ -3,32 +3,6 @@
 Connects OctoPrint to the PolarCloud so that you can easily monitor and control
 your printer from anywhere via https://polar3d.com
 
-## PLEASE READ: Manual prerequisite install necessary.
-
-There's an incompatibility between the pip and pyOpenSSL that will often cause
-problems with installing this plugin.  The following steps downgrade pip to a
-version that can more reliably install pyOpenSSL.  Unfortunately, it'll also
-give you that pip warning whenever you install a plugin (but is ignorable).
-
-## ** IMPORTANT **
-Be careful with the "rm -rf" lines. It deletes everything it touches all the
-way down. Be sure you've typed out the part with OpenSSL or pyOpenSSL and don't
-put any accidental spaces in it
-
-```
-source ~/oprint/bin/activate
-pip install --upgrade "pip>=8,<9"
-rm -rf ~/oprint/lib/python2.7/site-packages/OpenSSL*
-rm -rf ~/oprint/lib/python2.7/site-packages/pyOpenSSL*
-pip install --upgrade pyOpenSSL
-pip install --upgrade pyOpenSSL
-sudo service octoprint restart
-```
-
-The first of the two pyOpenSSL will fail with a message about unable to remove
-the old version of pyOpenSSL (and a couple of warnings).  But the second one
-should succeed
-
 ## Setup
 
 Install via OctoPrint's [Plugin Manager](https://github.com/foosel/OctoPrint/wiki/Plugin:-Plugin-Manager)
@@ -69,8 +43,18 @@ printer with your PolarCloud user account.
 
 ## Notes and Beta Limitations
 
+* Printing from the cloud requires the CuraEngine path to be set properly in
+  the Cura slicer plugin (octopi has this set up already)
 * Currently the Polar cloud cannot cause OctoPrint to reconnect with your
   printer.  Therefore you'll want "Auto-connect on server startup" to be
   checked in OctoPrint's Serial Settings. You'll also want to make sure the
   correct port and baudrate are saved in settings.
 * The plugin does not yet upload timelapse movies to OctoPrint
+
+## Note for Users running OctoPrint on Windows
+
+If you've got an old version of pyopenssl installed into the OctoPrint
+environment and you don't have ssh-keygen on your path, this plugin won't be
+able to register your printer with Polar Cloud. You'll get something about
+'ssh-keygen' not found in octoprint.log.  You can fix this by updating
+pyOpenSSL and restarting OctoPrint.

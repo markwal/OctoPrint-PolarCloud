@@ -11,7 +11,7 @@ plugin_author = "Mark Walker"
 plugin_author_email = "markwal@hotmail.com"
 plugin_url = "https://github.com/markwal/OctoPrint-PolarCloud"
 plugin_license = "AGPLv3"
-plugin_requires = ["SocketIO-client", "pyopenssl>=16.1", "Pillow"]
+plugin_requires = ["SocketIO-client", "pyopenssl", "Pillow"]
 
 ### --------------------------------------------------------------------------------------------------------------------
 ### More advanced options that you usually shouldn't have to touch follow after this point
