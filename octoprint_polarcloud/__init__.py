@@ -267,14 +267,14 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.error("Unable to generate or access key.")
 			return
 
-		if hasattr(self._key, dump_publickey):
-			self._publickey = crypto.dump_publickey(crypto.FILETYPE_PEM, self._key)
+		if hasattr(self._key, 'dump_publickey'):
+			self._public_key = crypto.dump_publickey(crypto.FILETYPE_PEM, self._key)
 		else:
 			pubkey_filename = key_filename + ".pub"
 			if not os.path.isfile(pubkey_filename):
 				try:
 					p = sarge.run("ssh-keygen -e -m PEM -f {key_filename} > {pubkey_filename}".format(key_filename=key_filename, pubkey_filename=pubkey_filename),
-							stdout=sarge.Capture(), stderr=sarge.Capture())
+							stderr=sarge.Capture())
 					if p.returncode != 0:
 						self._logger.error("Unable to generate public key (may need to manually upgrade pyOpenSSL, see README) {}: {}".format(p.returncode, p.stderr))
 						return
@@ -282,7 +282,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					self._logger.exception("Unable to generate public key (may need to manually upgrade pyOpenSSL, see README)")
 					return
 			with open(pubkey_filename) as f:
-				self._publickey = f.read()
+				self._public_key = f.read()
 
 	def _polar_status_from_state(self):
 		state_mapping = {
@@ -624,7 +624,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"mfg": "op",
 			"email": email,
 			"pin": pin,
-			"publicKey": crypto.dump_publickey(crypto.FILETYPE_PEM, self._key),
+			"publicKey": self._public_key,
 			"myInfo": {
 				"MAC": get_mac(),
 				"protocolVersion": "2"
@@ -853,7 +853,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._update_local_settings()
 			if (self._printer_type != self._settings.get(['printer_type'])):
 				self._task_queue.put(self._hello)
-		elif hasattr(Events, PRINTER_STATE_CHANGED) and event == Events.PRINTER_STATE_CHANGED:
+		elif hasattr(Events, 'PRINTER_STATE_CHANGED') and event == Events.PRINTER_STATE_CHANGED:
 			pass
 		else:
 			return
