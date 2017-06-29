@@ -825,6 +825,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _job(self, job_id, state):
 		self._logger.debug('job')
+		self._job_pending = False
 		if self._serial:
 			self._socket.emit('job', {
 				'serialNumber': self._serial,
@@ -866,6 +867,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._pstate = self.PSTATE_COMPLETE
 			if self._cloud_print:
 				self._pstate_counter = 3
+			self._job(self._job_id, "completed")
 		elif event == Events.SLICING_CANCELLED or event == Events.SLICING_FAILED:
 			self._pstate = self.PSTATE_CANCELLING
 			self._pstate_counter = 3
@@ -881,9 +883,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		self._status_now = True
 		if self._job_pending and not self._printer.is_printing() and not self._printer.is_paused() and self._pstate != self.PSTATE_PREPARING:
-			self._job_pending = False
 			self._logger.debug("emitting job due to event: {}".format(event))
-			self._job(self._job_id, "completed" if event == Events.PRINT_DONE else "canceled")
+			self._job(self._job_id, "canceled")
 
 	#~~ SimpleApiPlugin mixin
 
