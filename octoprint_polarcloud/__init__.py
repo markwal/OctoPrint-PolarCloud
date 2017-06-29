@@ -1024,7 +1024,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"supportxydistance":    ("support_xy_distance", mm_from_um),
 			"supportzdistance":     ("support_z_distance", mm_from_um),
 			"supportlinedistance":  ("support_fill_rate",  lambda x: 100.0 * extrusion_width / mm_from_um(x)),
-			"startcode":            ("start_gcode",        lambda x: ["(ignore octoprint default temps T0:{print_temperature})\n(bed:{print_bed_temperature})\n" + x[3:-3]]),
+			"startcode":            ("start_gcode",        lambda x: ["(@ignore {print_temperature})\n(@ignore {print_bed_temperature})\n" + x[3:-3]]),
 			"endcode":              ("end_gcode",          lambda x: [x[3:-3]])
 		}
 
@@ -1069,6 +1069,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				description="Polar Cloud sends this slicing profile down with each cloud print (overwritten each time)")
 		return (profile, (posx, posy))
 
+	def strip_ignore(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		if cmd and cmd.startswith == "(@ignore":
+			return None,
+
 __plugin_name__ = "PolarCloud"
 
 def __plugin_load__():
@@ -1078,5 +1082,6 @@ def __plugin_load__():
 	global __plugin_hooks__
 	__plugin_hooks__ = {
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.strip_ignore
 	}
 
