@@ -134,7 +134,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._max_image_size = 150000
 		self._printer_type = None
 		self._disconnect_on_register = False
-		self._hello_attempted = False
+		self._hello_sent = False
 
 	##~~ SettingsPlugin mixin
 
@@ -225,8 +225,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		# Create socket and set up event handlers
 		try:
+			self._challenge = None
 			self._connected = True
-			self._hello_attempted = False
+			self._hello_sent = False
 			self._socket = SocketIO(self._settings.get(['service']), Namespace=LoggingNamespace, verify=True, wait_for_connection=False)
 		except (TimeoutError, ConnectionError, StopIteration):
 			self._socket = None
@@ -358,7 +359,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _current_status(self):
 		temps = self._printer.get_current_temperatures()
-		self._logger.debug("{}".format(repr(temps)))
+		self._logger.debug("temps: {}".format(repr(temps)))
 		status = {
 			"serialNumber": self._serial,
 			"status": self._polar_status_from_state(),
@@ -405,81 +406,93 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	# thread to update the polar cloud with current status periodically
 	def _polar_status_heartbeat(self):
+
+		def _wait_and_process(seconds, ignore_status_now=False):
+			try:
+				for i in range(seconds):
+					if not self._task_queue.empty():
+						try:
+							task = self._task_queue.get_nowait()
+							task()
+						except Queue.Empty:
+							pass
+					if not ignore_status_now and self._status_now:
+						self._status_now = False
+						self._logger.debug("_status_now break")
+						return False
+					self._socket.wait(seconds=1)
+					if not self._connected:
+						self._socket = None
+						return False
+				return True
+			except:
+				if not self._connected:
+					# likely throw from disconnect
+					self._socket = None
+				else:
+					self._logger.exception("polar_heartbeat exception")
+					sleep(5)
+				return False
+
 		try:
 			self._logger.debug("heartbeat")
 			random.seed()
 			next_check_versions = datetime.datetime.now() 
 			status_sent = 0
 			self._create_socket()
+
+			while True:
+				self._logger.debug("self._socket: {}".format(repr(self._socket)))
+				if self._socket:
+					_wait_and_process(10)
+				else:
+					reconnection_delay = random.uniform(1.5, 3)
+					self._logger.warn("unable to create socket to Polar Cloud, check again in {} seconds".format(reconnection_delay))
+					sleep(reconnection_delay)
+					self._create_socket()
+
+				# wait until we get a hello
+				if not self._hello_sent:
+					continue
+
+				self._status_now = False
+				_wait_and_process(5, True)
+				self._ensure_idle_upload_url()
+				skip_snapshot = False
+
+				while self._connected:
+					status = self._current_status()
+					self._logger.debug("emit status: {}".format(repr(status)))
+					self._socket.emit("status", status)
+					status_sent += 1
+
+					if datetime.datetime.now() > next_check_versions:
+						self._check_versions()
+						next_check_versions = datetime.datetime.now() + datetime.timedelta(days=1)
+
+					# reset update interval to slow if we're not printing anymore
+					# we do it here so we get one quick update when it changes
+					if not self._cloud_print and not self._printer.is_printing():
+						self._update_interval = 60
+
+					if _wait_and_process(self._update_interval):
+						if self._printer.is_closed_or_error() and not self._printer.is_error():
+							if skip_snapshot:
+								continue
+							skip_snapshot = True
+						else:
+							skip_snapshot = False
+						self._upload_snapshot()
+
+				self._logger.info("Socket disconnected, clear and restart")
+				if status_sent < 3 and not self._disconnect_on_register:
+					self._logger.warn("Unable to connect to Polar Cloud")
+					break
+				self._logger.debug("bottom of forever")
+
 		except:
 			self._logger.exception("heartbeat failure")
 			return
-		while True:
-			self._logger.debug("self._socket: {}".format(repr(self._socket)))
-			if self._socket:
-				try:
-					task = self._task_queue.get_nowait()
-					task()
-				except Queue.Empty:
-					pass
-				self._socket.wait(seconds=10)
-			else:
-				reconnection_delay = random.uniform(1.5, 3)
-				self._logger.warn("unable to create socket to Polar Cloud, check again in {} seconds".format(reconnection_delay))
-				sleep(reconnection_delay)
-				self._create_socket()
-
-			if not self._socket:
-				continue
-
-			while self._connected:
-				try:
-					self._status_now = False
-					if self._serial and self._hello_attempted:
-						status = self._current_status()
-						self._logger.debug("emit status: {}".format(repr(status)))
-						self._socket.emit("status", status)
-						status_sent += 1
-
-						if datetime.datetime.now() > next_check_versions:
-							self._check_versions()
-							next_check_versions = datetime.datetime.now() + datetime.timedelta(days=1)
-
-						# reset update interval to slow if we're not printing anymore
-						# we do it here so we get one quick update when it changes
-						if not self._cloud_print and not self._printer.is_printing():
-							self._update_interval = 60
-
-					# wait for _update_interval seconds in 1 second chunks so that
-					# _update_interval can more quickly change when we start
-					# printing and so we get around to queued tasks
-					for i in range(self._update_interval):
-						if not self._task_queue.empty():
-							try:
-								task = self._task_queue.get_nowait()
-								task()
-							except Queue.Empty:
-								pass
-						if self._status_now:
-							self._logger.debug("_status_now break")
-							break
-						self._socket.wait(seconds=1)
-						if not self._connected:
-							break
-					else:
-						if self._serial:
-							self._upload_snapshot()
-
-				except:
-					self._logger.exception("polar_heartbeat exception")
-					sleep(5)
-
-			self._logger.info("Socket disconnected, clear and restart")
-			self._socket = None
-			if status_sent < 3 and not self._disconnect_on_register:
-				self._logger.warn("Unable to connect to Polar Cloud")
-				break
-			self._logger.debug("bottom of forever")
 
 	def _on_disconnect(self):
 		self._logger.debug("[Disconnected]")
@@ -602,8 +615,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _hello(self):
 		self._logger.debug('hello')
-		self._hello_attempted = True
 		if self._serial and self._challenge:
+			self._hello_sent = True
+			self._status_now = True
 			self._logger.debug('emit hello')
 			self._printer_type = self._settings.get(["printer_type"])
 			camUrl = normalize_url(self._settings.global_get(["webcam", "stream"]))
@@ -617,7 +631,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'camUrl': camUrl,
 				'printerType': self._printer_type
 			})
-			self._task_queue.put(self._ensure_idle_upload_url)
+			self._challenge = None
 		else:
 			self._logger.debug('skip emit hello, serial: {}'.format(self._serial))
 
@@ -840,6 +854,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _job(self, job_id, state):
 		self._logger.debug('job')
+		self._job_pending = False
 		if self._serial:
 			self._socket.emit('job', {
 				'serialNumber': self._serial,
@@ -882,6 +897,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if self._cloud_print:
 				self._pstate = self.PSTATE_POSTPROCESSING
 				self._pstate_counter = 3
+			self._job(self._job_id, "completed")
 		elif event == Events.SLICING_CANCELLED or event == Events.SLICING_FAILED:
 			self._pstate = self.PSTATE_CANCELLING
 			self._pstate_counter = 3
@@ -919,9 +935,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		self._status_now = True
 		if self._job_pending and not self._printer.is_printing() and not self._printer.is_paused() and self._pstate != self.PSTATE_PREPARING:
-			self._job_pending = False
 			self._logger.debug("emitting job due to event: {}".format(event))
-			self._job(self._job_id, "completed" if event == Events.PRINT_DONE else "canceled")
+			self._job(self._job_id, "canceled")
 
 	#~~ SimpleApiPlugin mixin
 
@@ -1061,7 +1076,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"supportxydistance":    ("support_xy_distance", mm_from_um),
 			"supportzdistance":     ("support_z_distance", mm_from_um),
 			"supportlinedistance":  ("support_fill_rate",  lambda x: 100.0 * extrusion_width / mm_from_um(x)),
-			"startcode":            ("start_gcode",        lambda x: ["(ignore octoprint default temps T0:{print_temperature})\n(bed:{print_bed_temperature})\n" + x[3:-3]]),
+			"startcode":            ("start_gcode",        lambda x: ["(@ignore {print_temperature})\n(@ignore {print_bed_temperature})\n" + x[3:-3]]),
 			"endcode":              ("end_gcode",          lambda x: [x[3:-3]])
 		}
 
@@ -1106,6 +1121,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				description="Polar Cloud sends this slicing profile down with each cloud print (overwritten each time)")
 		return (profile, (posx, posy))
 
+	def strip_ignore(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		if cmd and cmd.startswith == "(@ignore":
+			return None,
 
 	#~~ Timelapse
 
@@ -1151,6 +1169,7 @@ def __plugin_load__():
 
 	global __plugin_hooks__
 	__plugin_hooks__ = {
-		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
+		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.strip_ignore
 	}
 
