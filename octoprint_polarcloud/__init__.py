@@ -560,6 +560,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _upload_timelapse(self, path):
 		self._logger.debug("_upload_timelapse")
+		self._pstate = self.PSTATE_COMPLETE
+		self._pstate_counter = 3
 		if not self._ensure_upload_url('timelapse'):
 			return
 		try:
@@ -922,7 +924,11 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 		elif event == Events.MOVIE_DONE:
 			if self._cloud_print:
-				translate = self.PolarTimelapseTranscoder(movie, movie_basename, self._upload_timelapse)
+				self._ensure_upload_url('timelapse')
+				translate = PolarTimelapseTranscoder(payload["movie"],
+						payload["movie_basename"], self._upload_timelapse,
+						self._logger)
+				self._pstate = self.PSTATE_POSTPROCESSING
 				translate.translate_timelapse()
 			else:
 				self._pstate = self.PSTATE_COMPLETE
@@ -1122,6 +1128,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		return (profile, (posx, posy))
 
 	def strip_ignore(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		self._logger.debug("strip_ignore cmd = {}".format(cmd))
 		if cmd and cmd.startswith == "(@ignore":
 			return None,
 
@@ -1129,37 +1136,34 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 class PolarTimelapseTranscoder(object):
 
-	def __init__(self, octoprint_movie, movie_basename, callback):
+	def __init__(self, octoprint_movie, movie_basename, callback, logger):
 		self._octoprint_movie = octoprint_movie
 		self._polar_movie = movie_basename + ".mp4"
 		self._callback = callback
+		self._logger = logger
 
-	def translate_timelapse(self, octoprint_movie):
-		self._pstate = self.PSTATE_POSTPROCESSING
+	def translate_timelapse(self):
 		self._thread = threading.Thread(target=self._translate_timelapse_worker,
-				name="PolarCloudTimelapseJob_{octoprint_movie}".format(octoprint_movie=octoprint_movie))
+				name="PolarCloudTimelapseJob_{octoprint_movie}".format(octoprint_movie=self._octoprint_movie))
 		self._thread.daemon = True
 		self._thread.start()
 
 	# working thread for converting from OctoPrint's timelapse format to PolarCloud's
 	def _translate_timelapse_worker(self):
-		if not self._ensure_upload_url('timelapse'):
-			return
 		command = 'gst-launch-1.0 -e filesrc location="{infile}" ! decodebin name=decode ! x264enc ! queue ! qtmux name=mux ! filesink location={outfile} decode. ! mux.'.format(
 				infile=self._octoprint_movie, outfile=self._polar_movie)
+		self._logger.debug("timelapse command: {}".format(command))
 
 		try:
 			p = sarge.run(command, stdout=sarge.Capture(), stderr=sarge.Capture())
 			if p.returncode != 0:
 				self._logger.warn("Could not render movie, got return code {returncode}: {stderr_text}".format(returncode=p.returncode, stderr_text=p.stderr.text))
 			else:
+				self._logger.debug("gstreamer succeded: {}".format(p.stdout.text))
 				self._callback(self._polar_movie)
 
 		except:
 			self._logger.exception("Could not render movie due to unknown error")
-
-		self._pstate = self.PSTATE_COMPLETE
-		self._pstate_counter = 3
 
 __plugin_name__ = "PolarCloud"
 
