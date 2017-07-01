@@ -1084,7 +1084,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		return (profile, (posx, posy))
 
 	def strip_ignore(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
-		if cmd and cmd.startswith == "(@ignore":
+		if cmd and cmd.startswith("(@ignore"):
 			return None,
 
 __plugin_name__ = "PolarCloud"
