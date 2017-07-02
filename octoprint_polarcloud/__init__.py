@@ -817,6 +817,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _on_update(self, data, *args, **kwargs):
 		if not self._valid_packet(data):
 			return
+		self._logger.debug("update")
 		try:
 			softwareupdate = self._get_softwareupdate_plugin()
 			if softwareupdate:
@@ -833,13 +834,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ setVersion
 
 	def _check_versions(self):
+		running_version = 'unknown'
+		latest_version = 'unknown'
 		try:
 			softwareupdate = self._get_softwareupdate_plugin()
 			if softwareupdate:
 				version_info = softwareupdate.get_current_versions(['octoprint'])[0]['octoprint']
 				self._logger.debug("version_info: {}".format(repr(version_info)))
-				running_version = version_info['information']['local']['name']
-				latest_version = version_info['information']['remote']['name']
+				running_version = version_info['information']['local']['value']
+				latest_version = version_info['information']['remote']['value']
 		except:
 			self._logger.exception("Couldn't get softwareupdate plugin information")
 			return
