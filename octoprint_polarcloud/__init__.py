@@ -42,6 +42,7 @@ from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
 import sarge
 import flask
+from flask.ext.babel import gettext, _
 import requests
 from PIL import Image
 
@@ -66,17 +67,14 @@ def get_ip():
 # take a server relative or localhost url and attempt to make absolute an absolute
 # url out of it  (guess about which interface)
 def normalize_url(url):
-	try:
-		urlp = urlparse(url)
-		scheme = urlp.scheme
-		if not scheme:
-			scheme = "http"
-		host = urlp.netloc
-		if not host or host == '127.0.0.1' or host == 'localhost':
-			host = get_ip()
-		return urlunparse((scheme, host, urlp.path, urlp.params, urlp.query, urlp.fragment))
-	except:
-		self._logger.exception("Unable to canonicalize the url {}".format(url))
+	urlp = urlparse(url)
+	scheme = urlp.scheme
+	if not scheme:
+		scheme = "http"
+	host = urlp.netloc
+	if not host or host == '127.0.0.1' or host == 'localhost':
+		host = get_ip()
+	return urlunparse((scheme, host, urlp.path, urlp.params, urlp.query, urlp.fragment))
 
 # do a dictionary lookup and return an empty string for any missing key
 # rather than throw MissingKey
@@ -622,7 +620,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._status_now = True
 			self._logger.debug('emit hello')
 			self._printer_type = self._settings.get(["printer_type"])
-			camUrl = normalize_url(self._settings.global_get(["webcam", "stream"]))
+			camUrl = self._settings.global_get(["webcam", "stream"])
+			try:
+				if camUrl:
+					camUrl = normalize_url(camUrl)
+			except:
+				self._logger.exception("Unable to canonicalize the url {}".format(camUrl))
 			self._logger.debug("camUrl: {}".format(camUrl))
 			self._socket.emit('hello', {
 				'serialNumber': self._serial,
@@ -652,19 +655,36 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._disconnect_on_register = True
 			self._socket.disconnect()
 		else:
+			reason = ""
+			if 'reason' in response:
+				if response['reason'] in ['MFG_MISSING', 'MFG_UNKNOWN']:
+					reason = _("There is a problem or a bug in this plugin.")
+				elif response['reason'] == 'EMAIL_PIN_ERROR':
+					reason = _("The e-mail address and/or the PIN are not recognized by Polar Cloud.")
+				elif response['reason'] == 'SERVER_ERROR':
+					reason = _("Polar Cloud was unable to add the printer. Try again later.")
+				elif response['reason'] == 'FORBIDDEN':
+					reason = _("This OctoPrint instance is already registered to another account.")
+			# WARNING do not send unencoded user input in 'reason' since it is
+			# rendered directly into the HTML of the page
 			self._plugin_manager.send_plugin_message(self._identifier, {
-				'command': 'registration_failed'
+				'command': 'registration_failed',
+				'reason': reason
 			})
 
 	def _register(self, email, pin):
 		self._get_keys()
 		if not self._key:
 			self._logger.info("Can't register because unable to generate signing key")
+			self._plugin_manager.send_plugin_message(self._identifier, {
+				'command': 'registration_failed',
+				'reason': _('The plugin failed to generate a signing key. Please see troubleshooting tips in the <A href="https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md">README</A>.')
+			})
 			return False
 
 		if not self._socket:
 			self._start_polar_status()
-			sleep(1) # give the thread a moment to start communicating
+			sleep(2) # give the thread a moment to start communicating
 			self._logger.debug("Do we have a socket: {}".format(repr(self._socket)))
 		if not self._socket:
 			self._logger.info("Can't register because unable to communicate with Polar Cloud")
@@ -814,6 +834,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _on_update(self, data, *args, **kwargs):
 		if not self._valid_packet(data):
 			return
+		self._logger.debug("update")
 		try:
 			softwareupdate = self._get_softwareupdate_plugin()
 			if softwareupdate:
@@ -830,13 +851,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ setVersion
 
 	def _check_versions(self):
+		running_version = 'unknown'
+		latest_version = 'unknown'
 		try:
 			softwareupdate = self._get_softwareupdate_plugin()
 			if softwareupdate:
 				version_info = softwareupdate.get_current_versions(['octoprint'])[0]['octoprint']
 				self._logger.debug("version_info: {}".format(repr(version_info)))
-				running_version = version_info['information']['local']['name']
-				latest_version = version_info['information']['remote']['name']
+				running_version = version_info['information']['local']['value']
+				latest_version = version_info['information']['remote']['value']
 		except:
 			self._logger.exception("Couldn't get softwareupdate plugin information")
 			return
