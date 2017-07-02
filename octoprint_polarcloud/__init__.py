@@ -657,6 +657,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._get_keys()
 		if not self._key:
 			self._logger.info("Can't register because unable to generate signing key")
+			self._plugin_manager.send_plugin_message(self._identifier, {
+				'command': 'registration_failed',
+				'reason': _('The plugin failed to generate a signing key. Please see troubleshooting tips in the <A href="https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md">README</A>.')
+			})
 			return False
 
 		if not self._socket:
