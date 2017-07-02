@@ -64,6 +64,7 @@
             <div class="row-fluid">
                 <div class="alert alert-error span9" data-bind="visible: registrationFailed">
                     {{ _('Failed to register OctoPrint with the Polar Cloud.') }}
+                    <span data-bind="text: registrationFailedReason"></span>
                 </div>
             </div>
             <div class="control-group">

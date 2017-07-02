@@ -29,6 +29,7 @@ $(function() {
         self.pin = ko.observable("");
         self.registering = ko.observable(false);
         self.registrationFailed = ko.observable(false);
+        self.registrationFailedReason = ko.observable("");
         self.printerTypes = ko.observableArray()
 
         self._ensureCurrentPrinterType = function() {
@@ -67,6 +68,7 @@ $(function() {
                 if (self.registering()) {
                     self.registering(false);
                     self.registrationFailed(true);
+                    self.registrationFailedReason("Couldn't connect to the Polar Cloud.");
                 }
             }, 10000);
             OctoPrint.simpleApiCommand("polarcloud", "register", {
@@ -84,6 +86,7 @@ $(function() {
             if (data.command == "registration_failed") {
                 self.registering(false);
                 self.registrationFailed(true);
+                self.registrationFailedReason(data.reason);
                 return;
             }
 
