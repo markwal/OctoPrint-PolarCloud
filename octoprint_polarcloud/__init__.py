@@ -648,6 +648,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					reason = _("Polar Cloud was unable to add the printer. Try again later.")
 				elif response['reason'] == 'FORBIDDEN':
 					reason = _("This OctoPrint instance is already registered to another account.")
+			# WARNING do not send unencoded user input in 'reason' since it is
+			# rendered directly into the HTML of the page
 			self._plugin_manager.send_plugin_message(self._identifier, {
 				'command': 'registration_failed',
 				'reason': reason
