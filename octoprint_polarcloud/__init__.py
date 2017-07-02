@@ -217,7 +217,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _valid_packet(self, data):
 		if not self._serial or self._serial != data.get("serialNumber", ""):
 			self._logger.debug("Serial number is '{}'".format(repr(self._serial)))
-			self._logger.debug("Ignoring message to '{}'".format(data.get("serialNumber", "")))
+			self._logger.debug("Ignoring message (mismatch serial): {}".format(repr(data)))
 			return False
 		return True
 
@@ -521,7 +521,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._snapshot_url:
 			return False
 		if not upload_type in self._upload_location or datetime.datetime.now() > self._upload_location[upload_type]['expires']:
-			self._get_url(upload_type, self._get_job_id())
+			self._get_url(upload_type, self._job_id if upload_type == 'timelapse' else self._get_job_id())
 			return False
 		return True
 
@@ -576,21 +576,23 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._pstate = self.PSTATE_COMPLETE
 		self._pstate_counter = 3
 		if not self._ensure_upload_url('timelapse'):
+			self._logger.error("Unable to retrieve valid destination to upload timelapse {}".format(path))
 			return
 		try:
+			self._logger.debug("Uploading timelapse {}".format(path))
 			loc = self._upload_location['timelapse']
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('timelapse.mp4', open(path, 'rb'))})
 			p.raise_for_status()
-			self._logger.debug("{}: {}".format(p.status_code, p.content))
+			self._logger.debug("timelapse upload result {}: {}".format(p.status_code, p.content))
 		except Exception as e:
-			self._logger.exception("Could not post snapshot to PolarCloud")
+			self._logger.exception("Could not upload timelapse {} to PolarCloud".format(path))
 
 	#~~ getUrl -> polar: getUrlResponse
 
 	def _on_get_url_response(self, response, *args, **kwargs):
+		self._logger.debug('getUrlResponse {}'.format(repr(response)))
 		if not self._valid_packet(response):
 			return
-		self._logger.debug('getUrlResponse {}'.format(repr(response)))
 		if not has_all(response, 'status'):
 			self._logger.warn('getUrlResponse lacks status property')
 			return
@@ -611,7 +613,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#	'printing'/'timelapse' for cloud initiated print only
 	# job_id - cloud assigned print job id ('123' for local print)
 	def _get_url(self, url_type, job_id):
-		self._logger.debug('getUrl')
+		self._logger.debug('getUrl url_type: {}, job_id: {}'.format(url_type, job_id))
 		self._socket.emit('getUrl', {
 			'serialNumber': self._serial,
 			'method': 'post',
@@ -964,8 +966,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if self._cloud_print:
 				self._ensure_upload_url('timelapse')
 				translate = PolarTimelapseTranscoder(payload["movie"],
-						payload["movie_basename"], self._upload_timelapse,
-						self._logger)
+						self._upload_timelapse, self._logger)
 				self._pstate = self.PSTATE_POSTPROCESSING
 				translate.translate_timelapse()
 			else:
@@ -1173,8 +1174,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 class PolarTimelapseTranscoder(object):
 
-	def __init__(self, octoprint_movie, movie_basename, callback, logger):
+	def __init__(self, octoprint_movie, callback, logger):
 		self._octoprint_movie = octoprint_movie
+		movie_basename, ext = os.path.splitext(octoprint_movie)
 		self._polar_movie = movie_basename + ".mp4"
 		self._callback = callback
 		self._logger = logger
