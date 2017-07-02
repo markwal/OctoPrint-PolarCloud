@@ -37,6 +37,7 @@ from StringIO import StringIO
 import io
 from urlparse import urlparse, urlunparse
 import random
+import re
 
 from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
@@ -133,6 +134,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._printer_type = None
 		self._disconnect_on_register = False
 		self._hello_sent = False
+
+		# consider temp reads higher than this as having a target set for more
+		# frequent reports
+		self._set_temp_threshold = 50
 
 	##~~ SettingsPlugin mixin
 
@@ -376,15 +381,22 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"sliceDetails": "",  # Cura_SteamEngine output
 			"securityCode": ""   # three colors
 		}
+		target_set = False
 		if 'tool0' in temps:
 			status['tool0'] = temps['tool0']['actual']
 			status['targetTool0'] = temps['tool0']['target']
+			if status['targetTool0'] > 0 or status['tool0'] > self._set_temp_threshold:
+				target_set = True
 		if 'tool1' in temps:
 			status['tool1'] = temps['tool1']['actual']
 			status['targetTool1'] = temps['tool1']['target']
+			if status['targetTool1'] > 0 or status['tool1'] > self._set_temp_threshold:
+				target_set = True
 		if 'bed' in temps:
 			status['bed'] = temps['bed']['actual']
 			status['targetBed'] = temps['bed']['target']
+			if status['targetBed'] > 0 or status['bed'] > self._set_temp_threshold:
+				target_set = True
 
 		if self._printer.is_printing() or self._printer.is_paused():
 			data = self._printer.get_current_data()
@@ -400,7 +412,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						datetime.timedelta(seconds=int(status["printSeconds"]))).isoformat()
 			status["bytesRead"] = str_safe_get(data, "progress", "filepos")
 			status["fileSize"] = str_safe_get(data, "job", "file", "size")
-		return status
+
+		return status, target_set
 
 	# thread to update the polar cloud with current status periodically
 	def _polar_status_heartbeat(self):
@@ -459,7 +472,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				skip_snapshot = False
 
 				while self._connected:
-					status = self._current_status()
+					status, target_set = self._current_status()
 					self._logger.debug("emit status: {}".format(repr(status)))
 					self._socket.emit("status", status)
 					status_sent += 1
@@ -470,7 +483,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 					# reset update interval to slow if we're not printing anymore
 					# we do it here so we get one quick update when it changes
-					if not self._cloud_print and not self._printer.is_printing():
+					if target_set:
+						self._update_interval = 10
+					elif not self._cloud_print and not self._printer.is_printing():
 						self._update_interval = 60
 
 					if _wait_and_process(self._update_interval):
@@ -824,9 +839,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._valid_packet(data):
 			return
 		for key in data:
-			if re.match("(?bed)|(?tool[0-9]+)", key):
-				self._logger.debug("set_temperature {} to {}", key, data['key'])
-				self._printer.set_temperature(key, data['key'])
+			if re.match("(?:bed)|(?:tool[0-9]+)", key):
+				self._logger.debug("set_temperature {} to {}", key, data[key])
+				self._printer.set_temperature(key, data[key])
 		self._status_now = True
 
 	#~~ update
