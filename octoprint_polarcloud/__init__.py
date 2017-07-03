@@ -642,6 +642,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'localIP': get_ip(),
 				'protocol': '2',
 				'camUrl': camUrl,
+				'rotateImg': self._settings.global_get(["webcam", "flipV"]),
 				'printerType': self._printer_type
 			})
 			self._challenge = None
