@@ -149,7 +149,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			printer_type=None,
 			email="",
 			max_image_size = 150000,
-			verbose=False
+			verbose=False,
+			upload_timelapse=True
 		)
 
 	def _update_local_settings(self):
@@ -963,7 +964,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._status_now = True
 			return
 		elif event == Events.MOVIE_DONE:
-			if self._cloud_print:
+			if self._cloud_print and self._settings.get_boolean(['upload_timelapse']):
 				self._ensure_upload_url('timelapse')
 				translate = PolarTimelapseTranscoder(payload["movie"],
 						self._upload_timelapse, self._logger)
