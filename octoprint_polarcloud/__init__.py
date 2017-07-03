@@ -131,6 +131,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._pstate = self.PSTATE_IDLE # only applies if _cloud_print
 		self._pstate_counter = 0
 		self._max_image_size = 150000
+		self._image_transpose = False
 		self._printer_type = None
 		self._disconnect_on_register = False
 		self._hello_sent = False
@@ -157,6 +158,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("_update_local_settings")
 		self._max_image_size = self._settings.get(['max_image_size'])
 		self._serial = self._settings.get(['serial'])
+		self._image_transpose = (self._settings.global_get(["webcam", "flipH"]) or
+				self._settings.global_get(["webcam", "flipV"]) or
+				self._settings.global_get(["webcam", "rotate90"]))
 
 		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
 		if self._snapshot_url:
@@ -544,12 +548,18 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		try:
 			image_bytes = r.content
 			image_size = len(image_bytes)
-			if image_size > self._max_image_size:
+			if self._image_transpose or image_size > self._max_image_size:
 				self._logger.debug("Recompressing snapshot to smaller size")
 				buf = StringIO()
 				buf.write(image_bytes)
 				image = Image.open(buf)
 				image.thumbnail((640, 480))
+				if self._settings.global_get(["webcam", "flipH"]):
+					image = image.transpose(Image.FLIP_LEFT_RIGHT)
+				if self._settings.global_get(["webcam", "flipV"]):
+					image = image.transpose(Image.FLIP_TOP_BOTTOM)
+				if self._settings.global_get(["webcam", "rotate90"]):
+					image = image.transpose(Image.ROTATE_90)
 				image_bytes = StringIO()
 				image.save(image_bytes, format="jpeg")
 				image_bytes.seek(0, 2)
