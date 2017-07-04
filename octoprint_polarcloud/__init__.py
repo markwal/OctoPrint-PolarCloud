@@ -526,6 +526,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._snapshot_url:
 			return False
 		if upload_type != 'idle' and upload_type in self._upload_location and self._upload_location[upload_type]['jobID'] != self._job_id:
+			self._logger.debug("Discarding old upload url: {} for {}".format(upload_type, self._upload_location[upload_type]['jobID']))
 			del self._upload_location[upload_type]
 		if not upload_type in self._upload_location or datetime.datetime.now() > self._upload_location[upload_type]['expires']:
 			self._get_url(upload_type, self._get_job_id() if upload_type == 'idle' else self._job_id)
