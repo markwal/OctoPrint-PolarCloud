@@ -473,7 +473,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 				self._status_now = False
 				_wait_and_process(5, True)
-				self._ensure_idle_upload_url()
+				self._ensure_upload_url('idle')
 				skip_snapshot = False
 
 				while self._connected:
@@ -525,13 +525,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _ensure_upload_url(self, upload_type):
 		if not self._snapshot_url:
 			return False
+		if upload_type != 'idle' and upload_type in self._upload_location and self._upload_location[upload_type]['jobID'] != self._job_id:
+			del self._upload_location[upload_type]
 		if not upload_type in self._upload_location or datetime.datetime.now() > self._upload_location[upload_type]['expires']:
-			self._get_url(upload_type, self._job_id if upload_type == 'timelapse' else self._get_job_id())
+			self._get_url(upload_type, self._get_job_id() if upload_type == 'idle' else self._job_id)
 			return False
 		return True
-
-	def _ensure_idle_upload_url(self):
-		self._ensure_upload_url('idle')
 
 	def _upload_snapshot(self):
 		self._logger.debug("_upload_snapshot")
@@ -614,6 +613,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not has_all(response, 'type', 'expires', 'url', 'maxSize', 'fields'):
 			self._logger.warn('getUrlResponse lacks a required property')
 		response["expires"] = (datetime.datetime.now() + datetime.timedelta(seconds=int(response.get("expires", 0))))
+		if not has_all(response, 'jobID'):
+			response["jobID"] = self._job_id
 		self._upload_location[response.get('type', 'idle')] = response
 		self._logger.debug('response_type = {}'.format(response.get('type', '')))
 		if response.get('type', '') == 'idle':
@@ -822,12 +823,17 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._status_now = True
 
 		if not gcode:
-			self._file_manager.slice('cura',
-					FileDestinations.LOCAL, path,
-					FileDestinations.LOCAL, pathGcode,
-					position=pos, profile="polarcloud",
-					callback=self._on_slicing_complete,
-					callback_args=(self._file_manager.path_on_disk(FileDestinations.LOCAL, pathGcode),))
+			try:
+				self._file_manager.slice('cura',
+						FileDestinations.LOCAL, path,
+						FileDestinations.LOCAL, pathGcode,
+						position=pos, profile="polarcloud",
+						callback=self._on_slicing_complete,
+						callback_args=(self._file_manager.path_on_disk(FileDestinations.LOCAL, pathGcode),))
+			except:
+				self._logger.exception("Unable to slice.")
+				self._pstate = self.PSTATE_ERROR
+				self._pstate_counter = 3
 		else:
 			self._on_slicing_complete(path)
 
