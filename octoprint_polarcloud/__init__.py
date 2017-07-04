@@ -473,7 +473,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 				self._status_now = False
 				_wait_and_process(5, True)
-				self._ensure_upload_url('idle')
+				if self._socket:
+					self._ensure_upload_url('idle')
 				skip_snapshot = False
 
 				while self._connected:
