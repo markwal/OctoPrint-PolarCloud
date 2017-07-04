@@ -968,7 +968,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._task_queue.put(self._hello)
 			self._status_now = True
 			return
-		elif event == Events.MOVIE_RENDERING:
+		elif event == Events.MOVIE_RENDERING or event == Events.POSTROLL_START:
 			if self._cloud_print:
 				self._pstate = self.PSTATE_POSTPROCESSING
 				self._pstate_counter = 0
