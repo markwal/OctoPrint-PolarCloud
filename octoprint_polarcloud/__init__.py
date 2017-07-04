@@ -640,6 +640,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug('_on_welcome: {}'.format(repr(welcome)))
 		if 'challenge' in welcome:
 			self._challenge = welcome['challenge']
+			if isinstance(self._challenge, unicode):
+				self._challenge = self._challenge.encode('utf-8')
 			self._task_queue.put(self._hello)
 			self._start_polar_status()
 
