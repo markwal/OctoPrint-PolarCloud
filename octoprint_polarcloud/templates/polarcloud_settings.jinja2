@@ -51,6 +51,13 @@
     <div class="control-group">
         <div class="controls">
             <label class="checkbox">
+                <input type="checkbox" data-bind="checked: settings.upload_timelapse">{{ _('Upload timelapse videos to Polar Cloud.<BR>Requires GStreamer install, see <A href="https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md">README</A>.') }}
+            </label>
+        </div>
+    </div>
+    <div class="control-group">
+        <div class="controls">
+            <label class="checkbox">
                 <input type="checkbox" data-bind="checked: settings.verbose">{{ _('Verbose (debugging) logging') }}
             </label>
         </div>
