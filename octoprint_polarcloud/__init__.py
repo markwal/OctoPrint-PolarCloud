@@ -53,6 +53,7 @@ from octoprint.util import get_exception_string
 from octoprint.events import Events
 from octoprint.filemanager import FileDestinations
 from octoprint.filemanager.util import StreamWrapper
+from octoprint.settings import settings
 
 # logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
 # logging.basicConfig()
@@ -474,6 +475,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._status_now = False
 				_wait_and_process(5, True)
 				self._ensure_upload_url('idle')
+				self._custom_command_list()
 				skip_snapshot = False
 
 				while self._connected:
@@ -883,6 +885,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if softwareupdate and 'implementation' in dir(softwareupdate):
 			return softwareupdate.implementation
 		return None
+
+	#~~ customCommandList -> polar: customCommand
+
+	def _custom_command_list(self):
+		self._logger.debug("customCommandList")
+		for action in self._settings.global_get(["system", "actions"]):
+			self._logger.debug(repr(action))
+		self._logger.debug("customCommandList global")
+		for action in settings().get(["system", "actions"]):
+			self._logger.debug(repr(action))
 
 	#~~ setVersion
 
