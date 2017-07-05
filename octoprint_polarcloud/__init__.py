@@ -547,7 +547,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			loc = self._upload_location[upload_type]
 			r = requests.get(self._snapshot_url, timeout=5)
 			r.raise_for_status()
-		except Exception as e:
+		except Exception:
 			self._logger.exception("Could not capture image from {}".format(self._snapshot_url))
 			return
 
@@ -581,7 +581,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.debug("{}: {}".format(p.status_code, p.content))
 
 			self._logger.debug("Image captured from {}".format(self._snapshot_url))
-		except Exception as e:
+		except Exception:
 			self._logger.exception("Could not post snapshot to PolarCloud")
 
 	def _upload_timelapse(self, path):
@@ -597,7 +597,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('timelapse.mp4', open(path, 'rb'))})
 			p.raise_for_status()
 			self._logger.debug("timelapse upload result {}: {}".format(p.status_code, p.content))
-		except Exception as e:
+		except Exception:
 			self._logger.exception("Could not upload timelapse {} to PolarCloud".format(path))
 
 	#~~ getUrl -> polar: getUrlResponse
@@ -787,7 +787,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			try:
 				req_ini = requests.get(data['configFile'], timeout=5)
 				req_ini.raise_for_status()
-			except Exception as e:
+			except Exception:
 				self._logger.exception("Could not retrieve slicer config file from PolarCloud: {}".format(data['configFile']))
 				return
 			(slicing_profile, pos) = self._create_slicing_profile(req_ini.content)
@@ -800,7 +800,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			info['file'] = data['stlFile']
 			req_stl = requests.get(data['stlFile'], timeout=5)
 			req_stl.raise_for_status()
-		except Exception as e:
+		except Exception:
 			self._logger.exception("Could not retrieve print file from PolarCloud: {}".format(data['stlFile']))
 			return
 
@@ -889,12 +889,21 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ customCommandList -> polar: customCommand
 
 	def _custom_command_list(self):
-		self._logger.debug("customCommandList")
+		self._logger.debug("customCommandList system actions")
 		for action in self._settings.global_get(["system", "actions"]):
 			self._logger.debug(repr(action))
-		self._logger.debug("customCommandList global")
-		for action in settings().get(["system", "actions"]):
+		self._logger.debug("customCommandList server commands")
+		for action in self._settings.global_get(["server", "commands"]):
 			self._logger.debug(repr(action))
+		try:
+			from octoprint.server.api.system import _get_core_command_specs as system_commands
+			self._logger.debug(repr(system_commands()))
+		except Exception:
+			self._logger.exception("Could not retrieve system commands")
+			return
+
+	def _on_custom_command(self):
+		self._logger.debug("customCommand")
 
 	#~~ setVersion
 
