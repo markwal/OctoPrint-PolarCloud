@@ -29,27 +29,32 @@ printer with your PolarCloud user account.
   [project page](https://markwal.github.io/OctoPrint-PolarCloud) for a
   step-by-step instructions.
 * Visit https://polar3d.com and setup a PIN in Account Settings (click on your
-  portrait and choose Settings)
-* Bring up the plugin's settings via OctoPrint-\>Settings-\>PolarCloud
+  portrait and choose Settings).
+* Bring up the plugin's settings via OctoPrint-\>Settings-\>PolarCloud.
 * Choose the closest printer type to your printer. If your printer isn't listed
   please choose "Cartesian" or "Delta" (as appropriate) and later in the Polar UI
   you can adjust things like print area and start/end gcode when setting up a print.
 * Click the Register Printer button and fill out your email address and PIN
-  number (for your Polar3D account)
+  number (for your Polar3D account).
 * In a few moments it should fill out the Serial number field in OctoPrint
   settings, be sure to press "Save" on the Settings box to save the Serial Number.
 * If you visit the Polar Cloud and click on the hamburger and choose
-  "Printers", it should show your OctoPrint instance as one of your printers
+  "Printers", it should show your OctoPrint instance as one of your printers.
 
 ## Notes and Beta Limitations
 
 * Printing from the cloud requires the CuraEngine path to be set properly in
-  the Cura slicer plugin (octopi has this set up already)
-* Currently the Polar cloud cannot cause OctoPrint to reconnect with your
-  printer.  Therefore you'll want "Auto-connect on server startup" to be
-  checked in OctoPrint's Serial Settings. You'll also want to make sure the
-  correct port and baudrate are saved in settings.
-* The plugin does not yet upload timelapse movies to OctoPrint
+  the Cura slicer plugin (octopi has this set up already).
+* If you have a camera configured with OctoPrint you presently need to configure
+  OctoPrint to use an absolute URL rather than a relative URL.  This so that the
+  Polar Cloud's web interface can display the live camera feed in your web browser
+  when you are on the same local network as your printer's camera.
+* While the Polar Cloud does present a "CONNECT" button and can therefore
+  tell OctoPrint to connect via USB to your printer, the Polar Cloud cannot
+  specify the serial device to use or the baud rate.  You will want to set
+  and save those in OctoPrint.  Or, perhaps, avoid the issue entirely by
+  configuring OctoPrint to automatically connect to your printer when OctoPrint
+  starts.
 
 ## Note for Users running OctoPrint on Windows
 
