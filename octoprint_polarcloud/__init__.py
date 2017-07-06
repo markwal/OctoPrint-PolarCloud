@@ -922,7 +922,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("customCommandList")
 		self._socket.emit('customCommandList', {
 			'serialNumber': self._serial,
-			'customCommandList': command_list
+			'commandList': command_list
 		})
 
 	def _on_custom_command(self, data, *args, **kwargs):
