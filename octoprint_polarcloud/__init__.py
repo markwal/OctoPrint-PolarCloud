@@ -55,7 +55,7 @@ from octoprint.filemanager import FileDestinations
 from octoprint.filemanager.util import StreamWrapper
 from octoprint.settings import settings
 
-logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
+# logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
 # logging.basicConfig()
 
 # what's a mac address we can use as an identifier?
