@@ -257,6 +257,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('temperature', self._on_temperature)
 		self._socket.on('update', self._on_update)
 		self._socket.on('connectPrinter', self._on_connect_printer)
+		self._socket.on('customCommand', self._on_custom_command)
 
 	def _start_polar_status(self):
 		if not self._polar_status_worker:
@@ -926,6 +927,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _on_custom_command(self, data, *args, **kwargs):
 		self._logger.debug("customCommand: {}".format(repr(data)))
+		try:
+			source, command = data.split("/", 1)
+			from octoprint.server.api.system import executeSystemCommand
+			executeSystemCommand(source, command)
+		except Exception:
+			self._logger.exception("Could not execute system command: {}".format(repr(data)))
 
 	#~~ setVersion
 
