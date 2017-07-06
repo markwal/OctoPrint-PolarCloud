@@ -474,7 +474,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 				self._status_now = False
 				_wait_and_process(5, True)
-				self._ensure_upload_url('idle')
+				if self._socket:
+					self._ensure_upload_url('idle')
 				self._custom_command_list()
 				skip_snapshot = False
 
@@ -642,6 +643,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug('_on_welcome: {}'.format(repr(welcome)))
 		if 'challenge' in welcome:
 			self._challenge = welcome['challenge']
+			if isinstance(self._challenge, unicode):
+				self._challenge = self._challenge.encode('utf-8')
 			self._task_queue.put(self._hello)
 			self._start_polar_status()
 
