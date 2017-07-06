@@ -55,7 +55,7 @@ from octoprint.filemanager import FileDestinations
 from octoprint.filemanager.util import StreamWrapper
 from octoprint.settings import settings
 
-# logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
+logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
 # logging.basicConfig()
 
 # what's a mac address we can use as an identifier?
@@ -152,7 +152,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			email="",
 			max_image_size = 150000,
 			verbose=False,
-			upload_timelapse=True
+			upload_timelapse=True,
+			enable_system_commands=True
 		)
 
 	def _update_local_settings(self):
@@ -476,7 +477,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				_wait_and_process(5, True)
 				if self._socket:
 					self._ensure_upload_url('idle')
-				self._custom_command_list()
+					if self._settings.get_boolean(['enable_system_commands']):
+						self._custom_command_list()
 				skip_snapshot = False
 
 				while self._connected:
@@ -892,21 +894,38 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ customCommandList -> polar: customCommand
 
 	def _custom_command_list(self):
-		self._logger.debug("customCommandList system actions")
-		for action in self._settings.global_get(["system", "actions"]):
-			self._logger.debug(repr(action))
-		self._logger.debug("customCommandList server commands")
-		for action in self._settings.global_get(["server", "commands"]):
-			self._logger.debug(repr(action))
+		def _polar_custom_from_command(source, command):
+			custom = {
+				"label": str_safe_get(command, "name"),
+				"command": source + "/" + str_safe_get(command, "action")
+			}
+			confirm = str_safe_get(command, "confirm")
+			if confirm:
+				custom["confirmText"] = confirm
+			return custom
+
+		self._logger.debug("generating customCommandList")
+		command_list = []
 		try:
 			from octoprint.server.api.system import _get_core_command_specs as system_commands
-			self._logger.debug(repr(system_commands()))
+			for command in system_commands().values():
+				command_list.append(_polar_custom_from_command("core", command))
 		except Exception:
 			self._logger.exception("Could not retrieve system commands")
-			return
 
-	def _on_custom_command(self):
-		self._logger.debug("customCommand")
+		for command in self._settings.global_get(["system", "actions"]):
+			if not "action" in command:
+				continue
+			command_list.append(_polar_custom_from_command("custom", command))
+
+		self._logger.debug("customCommandList")
+		self._socket.emit('customCommandList', {
+			'serialNumber': self._serial,
+			'customCommandList': command_list
+		})
+
+	def _on_custom_command(self, data, *args, **kwargs):
+		self._logger.debug("customCommand: {}".format(repr(data)))
 
 	#~~ setVersion
 
