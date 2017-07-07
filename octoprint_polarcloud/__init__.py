@@ -136,6 +136,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._printer_type = None
 		self._disconnect_on_register = False
 		self._hello_sent = False
+		self._port = 80
 
 		# consider temp reads higher than this as having a target set for more
 		# frequent reports
@@ -203,6 +204,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		)
 
 	##~~ StartupPlugin mixin
+
+	def on_startup(self, host, port, *args, **kwargs):
+		self._port = port
 
 	def on_after_startup(self, *args, **kwargs):
 		if self._settings.get(['verbose']):
@@ -927,10 +931,18 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _on_custom_command(self, data, *args, **kwargs):
 		self._logger.debug("customCommand: {}".format(repr(data)))
+		if not self._valid_packet(data):
+			return
 		try:
-			source, command = data.split("/", 1)
-			from octoprint.server.api.system import executeSystemCommand
-			executeSystemCommand(source, command)
+			if not 'command' in data:
+				self._logger.warn("Ignoring custom command, no 'command' element: {}".format(repr(data)))
+				return
+			source, command = data['command'].split("/", 1)
+			url = "http://127.0.0.1:{port}/api/system/commands/{command}".format(port=self._port, command=data['command'])
+			headers = {'X-Api-Key': self._settings.global_get(['api', 'key'])}
+			r = requests.post(url, headers=headers)
+			r.raise_for_status()
+			self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
 		except Exception:
 			self._logger.exception("Could not execute system command: {}".format(repr(data)))
 
