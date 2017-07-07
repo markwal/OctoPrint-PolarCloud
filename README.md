@@ -48,7 +48,9 @@ printer with your PolarCloud user account.
 * If you have a camera configured with OctoPrint you presently need to configure
   OctoPrint to use an absolute URL rather than a relative URL.  This so that the
   Polar Cloud's web interface can display the live camera feed in your web browser
-  when you are on the same local network as your printer's camera.
+  when you are on the same local network as your printer's camera.  The plugin
+  will try to guess the absolute url if need be, but it can guess wrong if you
+  have more than one network interface configured.
 * While the Polar Cloud does present a "CONNECT" button and can therefore
   tell OctoPrint to connect via USB to your printer, the Polar Cloud cannot
   specify the serial device to use or the baud rate.  You will want to set
