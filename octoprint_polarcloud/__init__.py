@@ -53,7 +53,6 @@ from octoprint.util import get_exception_string
 from octoprint.events import Events
 from octoprint.filemanager import FileDestinations
 from octoprint.filemanager.util import StreamWrapper
-from octoprint.settings import settings
 
 # logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
 # logging.basicConfig()
@@ -165,10 +164,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._image_transpose = (self._settings.global_get(["webcam", "flipH"]) or
 				self._settings.global_get(["webcam", "flipV"]) or
 				self._settings.global_get(["webcam", "rotate90"]))
-
 		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-		if self._snapshot_url:
-			self._snapshot_url = self._snapshot_url
+		if self._socket and self._hello_sent:
+			self._task_queue.put(self._custom_command_list)
 
 	##~~ AssetPlugin mixin
 
@@ -482,8 +480,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				_wait_and_process(5, True)
 				if self._socket:
 					self._ensure_upload_url('idle')
-					if self._settings.get_boolean(['enable_system_commands']):
-						self._custom_command_list()
+					self._custom_command_list()
 				skip_snapshot = False
 
 				while self._connected:
@@ -911,17 +908,18 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		self._logger.debug("generating customCommandList")
 		command_list = []
-		try:
-			from octoprint.server.api.system import _get_core_command_specs as system_commands
-			for command in system_commands().values():
-				command_list.append(_polar_custom_from_command("core", command))
-		except Exception:
-			self._logger.exception("Could not retrieve system commands")
+		if self._settings.get_boolean(['enable_system_commands']):
+			try:
+				from octoprint.server.api.system import _get_core_command_specs as system_commands
+				for command in system_commands().values():
+					command_list.append(_polar_custom_from_command("core", command))
+			except Exception:
+				self._logger.exception("Could not retrieve system commands")
 
-		for command in self._settings.global_get(["system", "actions"]):
-			if not "action" in command:
-				continue
-			command_list.append(_polar_custom_from_command("custom", command))
+			for command in self._settings.global_get(["system", "actions"]):
+				if not "action" in command:
+					continue
+				command_list.append(_polar_custom_from_command("custom", command))
 
 		self._logger.debug("customCommandList")
 		self._socket.emit('customCommandList', {
