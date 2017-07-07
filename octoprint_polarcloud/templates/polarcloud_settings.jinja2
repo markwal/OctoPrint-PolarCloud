@@ -58,6 +58,13 @@
     <div class="control-group">
         <div class="controls">
             <label class="checkbox">
+                <input type="checkbox" data-bind="checked: settings.enable_system_commands">{{ _('Allow Polar Cloud to send system commands to OctoPrint<br>It\'s those commands on the power button icon ') }}<i class="icon-off"></i>{{ _(' at the top.') }}
+            </label>
+        </div>
+    </div>
+    <div class="control-group">
+        <div class="controls">
+            <label class="checkbox">
                 <input type="checkbox" data-bind="checked: settings.verbose">{{ _('Verbose (debugging) logging') }}
             </label>
         </div>

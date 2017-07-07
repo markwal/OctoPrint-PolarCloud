@@ -135,6 +135,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._printer_type = None
 		self._disconnect_on_register = False
 		self._hello_sent = False
+		self._port = 80
 
 		# consider temp reads higher than this as having a target set for more
 		# frequent reports
@@ -151,7 +152,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			email="",
 			max_image_size = 150000,
 			verbose=False,
-			upload_timelapse=True
+			upload_timelapse=True,
+			enable_system_commands=True
 		)
 
 	def _update_local_settings(self):
@@ -162,10 +164,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._image_transpose = (self._settings.global_get(["webcam", "flipH"]) or
 				self._settings.global_get(["webcam", "flipV"]) or
 				self._settings.global_get(["webcam", "rotate90"]))
-
 		self._snapshot_url = self._settings.global_get(["webcam", "snapshot"])
-		if self._snapshot_url:
-			self._snapshot_url = self._snapshot_url
+		if self._socket and self._hello_sent:
+			self._task_queue.put(self._custom_command_list)
 
 	##~~ AssetPlugin mixin
 
@@ -201,6 +202,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		)
 
 	##~~ StartupPlugin mixin
+
+	def on_startup(self, host, port, *args, **kwargs):
+		self._port = port
 
 	def on_after_startup(self, *args, **kwargs):
 		if self._settings.get(['verbose']):
@@ -255,6 +259,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('temperature', self._on_temperature)
 		self._socket.on('update', self._on_update)
 		self._socket.on('connectPrinter', self._on_connect_printer)
+		self._socket.on('customCommand', self._on_custom_command)
 
 	def _start_polar_status(self):
 		if not self._polar_status_worker:
@@ -475,6 +480,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				_wait_and_process(5, True)
 				if self._socket:
 					self._ensure_upload_url('idle')
+					self._custom_command_list()
 				skip_snapshot = False
 
 				while self._connected:
@@ -546,7 +552,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			loc = self._upload_location[upload_type]
 			r = requests.get(self._snapshot_url, timeout=5)
 			r.raise_for_status()
-		except Exception as e:
+		except Exception:
 			self._logger.exception("Could not capture image from {}".format(self._snapshot_url))
 			return
 
@@ -580,7 +586,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.debug("{}: {}".format(p.status_code, p.content))
 
 			self._logger.debug("Image captured from {}".format(self._snapshot_url))
-		except Exception as e:
+		except Exception:
 			self._logger.exception("Could not post snapshot to PolarCloud")
 
 	def _upload_timelapse(self, path):
@@ -596,7 +602,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('timelapse.mp4', open(path, 'rb'))})
 			p.raise_for_status()
 			self._logger.debug("timelapse upload result {}: {}".format(p.status_code, p.content))
-		except Exception as e:
+		except Exception:
 			self._logger.exception("Could not upload timelapse {} to PolarCloud".format(path))
 
 	#~~ getUrl -> polar: getUrlResponse
@@ -788,7 +794,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			try:
 				req_ini = requests.get(data['configFile'], timeout=5)
 				req_ini.raise_for_status()
-			except Exception as e:
+			except Exception:
 				self._logger.exception("Could not retrieve slicer config file from PolarCloud: {}".format(data['configFile']))
 				return
 			(slicing_profile, pos) = self._create_slicing_profile(req_ini.content)
@@ -801,7 +807,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			info['file'] = data['stlFile']
 			req_stl = requests.get(data['stlFile'], timeout=5)
 			req_stl.raise_for_status()
-		except Exception as e:
+		except Exception:
 			self._logger.exception("Could not retrieve print file from PolarCloud: {}".format(data['stlFile']))
 			return
 
@@ -886,6 +892,57 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if softwareupdate and 'implementation' in dir(softwareupdate):
 			return softwareupdate.implementation
 		return None
+
+	#~~ customCommandList -> polar: customCommand
+
+	def _custom_command_list(self):
+		def _polar_custom_from_command(source, command):
+			custom = {
+				"label": str_safe_get(command, "name"),
+				"command": source + "/" + str_safe_get(command, "action")
+			}
+			confirm = str_safe_get(command, "confirm")
+			if confirm:
+				custom["confirmText"] = confirm
+			return custom
+
+		self._logger.debug("generating customCommandList")
+		command_list = []
+		if self._settings.get_boolean(['enable_system_commands']):
+			try:
+				from octoprint.server.api.system import _get_core_command_specs as system_commands
+				for command in system_commands().values():
+					command_list.append(_polar_custom_from_command("core", command))
+			except Exception:
+				self._logger.exception("Could not retrieve system commands")
+
+			for command in self._settings.global_get(["system", "actions"]):
+				if not "action" in command:
+					continue
+				command_list.append(_polar_custom_from_command("custom", command))
+
+		self._logger.debug("customCommandList")
+		self._socket.emit('customCommandList', {
+			'serialNumber': self._serial,
+			'commandList': command_list
+		})
+
+	def _on_custom_command(self, data, *args, **kwargs):
+		self._logger.debug("customCommand: {}".format(repr(data)))
+		if not self._valid_packet(data):
+			return
+		try:
+			if not 'command' in data:
+				self._logger.warn("Ignoring custom command, no 'command' element: {}".format(repr(data)))
+				return
+			source, command = data['command'].split("/", 1)
+			url = "http://127.0.0.1:{port}/api/system/commands/{command}".format(port=self._port, command=data['command'])
+			headers = {'X-Api-Key': self._settings.global_get(['api', 'key'])}
+			r = requests.post(url, headers=headers)
+			r.raise_for_status()
+			self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
+		except Exception:
+			self._logger.exception("Could not execute system command: {}".format(repr(data)))
 
 	#~~ setVersion
 
