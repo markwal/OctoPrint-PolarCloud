@@ -38,6 +38,7 @@ import io
 from urlparse import urlparse, urlunparse
 import random
 import re
+import json
 
 from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
@@ -49,6 +50,7 @@ from PIL import Image
 
 import octoprint.plugin
 import octoprint.util
+import octoprint_client
 from octoprint.util import get_exception_string
 from octoprint.events import Events
 from octoprint.filemanager import FileDestinations
@@ -136,6 +138,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._disconnect_on_register = False
 		self._hello_sent = False
 		self._port = 80
+		self._octoprint_client = None
 
 		# consider temp reads higher than this as having a target set for more
 		# frequent reports
@@ -895,6 +898,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	#~~ customCommandList -> polar: customCommand
 
+	def _ensure_octoprint_client(self):
+		if not self._octoprint_client:
+			baseurl = octoprint_client.build_base_url(host="127.0.0.1", port=self._port)
+			self._octoprint_client = octoprint_client.Client(baseurl, self._settings.global_get(['api', 'key']))
+		return self._octoprint_client
+
 	def _custom_command_list(self):
 		def _polar_custom_from_command(source, command):
 			custom = {
@@ -910,16 +919,17 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		command_list = []
 		if self._settings.get_boolean(['enable_system_commands']):
 			try:
-				from octoprint.server.api.system import _get_core_command_specs as system_commands
-				for command in system_commands().values():
-					command_list.append(_polar_custom_from_command("core", command))
+				client = self._ensure_octoprint_client()
+				r = client.get("/api/system/commands")
+				r.raise_for_status()
+				commands_by_type = json.loads(r.content)
+				self._logger.debug("commands: {}".format(repr(commands_by_type)))
+				for command_group in commands_by_type.values():
+					self._logger.debug("command_group: {}".format(repr(command_group)))
+					for command in command_group:
+						command_list.append(_polar_custom_from_command(command['source'], command))
 			except Exception:
 				self._logger.exception("Could not retrieve system commands")
-
-			for command in self._settings.global_get(["system", "actions"]):
-				if not "action" in command:
-					continue
-				command_list.append(_polar_custom_from_command("custom", command))
 
 		self._logger.debug("customCommandList")
 		self._socket.emit('customCommandList', {
@@ -935,10 +945,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if not 'command' in data:
 				self._logger.warn("Ignoring custom command, no 'command' element: {}".format(repr(data)))
 				return
-			source, command = data['command'].split("/", 1)
-			url = "http://127.0.0.1:{port}/api/system/commands/{command}".format(port=self._port, command=data['command'])
-			headers = {'X-Api-Key': self._settings.global_get(['api', 'key'])}
-			r = requests.post(url, headers=headers)
+			client = self._ensure_octoprint_client()
+			r = client.post("/api/system/commands/" + data['command'], {})
 			r.raise_for_status()
 			self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
 		except Exception:
