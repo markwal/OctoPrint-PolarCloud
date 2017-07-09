@@ -418,7 +418,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			status["progressDetail"] = "Printing Job: {} Percent Complete: {:0.1f}%".format(
 				str_safe_get(data, 'file', 'name'), float_safe_get(data, 'progress', 'completion'))
 			status["estimatedTime"] = str_safe_get(data, "job", "estimatedPrintTime")
-			status["filamentUsed"] = str_safe_get(data, "job", "filament", "length")
+			filament_length = 0
+			if "job" in data and "filament" in data["job"] and isinstance(data["job"]["filament"], dict):
+				for tool, tool_info in data["job"]["filament"].items():
+					if "length" in tool_info:
+						filament_length += tool_info["length"]
+			status["filamentUsed"] = filament_length
 			status["printSeconds"] = str_safe_get(data, "progress", "printTime")
 			if status["printSeconds"]:
 				status["startTime"] = (datetime.datetime.now() -
