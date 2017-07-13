@@ -1,4 +1,4 @@
-# OctoPrint-PolarCloud (Beta)
+# OctoPrint-PolarCloud
 
 Connects OctoPrint to the PolarCloud so that you can easily monitor and control
 your printer from anywhere via https://polar3d.com
@@ -6,10 +6,12 @@ your printer from anywhere via https://polar3d.com
 ## Setup
 
 Install via OctoPrint's [Plugin Manager](https://github.com/foosel/OctoPrint/wiki/Plugin:-Plugin-Manager)
-via OctoPrint-\>Settings-\>Plugin Manager-\>Get More... then search for Polar or
-install via the "From URL" box using this URL:
+via OctoPrint-\>Settings-\>Plugin Manager-\>Get More... then search for Polar and
+click "Install".
 
-    https://github.com/markwal/OctoPrint-PolarCloud/archive/master.zip
+This may take a long while, especially if your platform needs to install and
+compile the cryptography package. It should be a reasonable wait on a Raspberry
+Pi Zero, 2 or 3 though.
 
 ## Enable Polar Cloud timelapses
 
@@ -41,7 +43,7 @@ printer with your PolarCloud user account.
 * If you visit the Polar Cloud and click on the hamburger and choose
   "Printers", it should show your OctoPrint instance as one of your printers.
 
-## Notes and Beta Limitations
+## Notes and Limitations
 
 * Printing from the cloud requires the CuraEngine path to be set properly in
   the Cura slicer plugin (octopi has this set up already).
