@@ -674,6 +674,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			except:
 				self._logger.exception("Unable to canonicalize the url {}".format(camUrl))
 			self._logger.debug("camUrl: {}".format(camUrl))
+			transformImg = 0
+			if self._settings.global_get(["webcam", "flipH"]):
+				transformImg += 1
+			if self._settings.global_get(["webcam", "flipV"]):
+				transformImg += 2
+			if self._settings.global_get(["webcam", "rotate90"]):
+				transformImg += 4
 			self._socket.emit('hello', {
 				'serialNumber': self._serial,
 				'signature': base64.b64encode(crypto.sign(self._key, self._challenge, b'sha256')),
@@ -681,7 +688,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'localIP': get_ip(),
 				'protocol': '2',
 				'camUrl': camUrl,
-				'rotateImg': 1 if self._settings.global_get(["webcam", "flipV"]) else 0,
+				'transformImg': transformImg,
 				'printerType': self._printer_type
 			})
 			self._challenge = None

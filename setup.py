@@ -36,7 +36,10 @@ plugin_ignored_packages = []
 # Example:
 #     plugin_requires = ["someDependency==dev"]
 #     additional_setup_parameters = {"dependency_links": ["https://github.com/someUser/someRepo/archive/master.zip#egg=someDependency-dev"]}
-additional_setup_parameters = {}
+#"dependency_links": ["https://www.dropbox.com/sh/jz5kduz7v6iuqwv/AAB-2vwh0R1_Bkyf_0YSHtz6a?dl=0"]
+additional_setup_parameters = {
+		"dependency_links": ["https://markwal.github.io/wheels/"]
+	}
 
 ########################################################################################################################
 
