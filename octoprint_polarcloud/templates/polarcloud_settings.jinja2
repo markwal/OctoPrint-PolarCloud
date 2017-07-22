@@ -52,7 +52,7 @@
     <div class="control-group">
         <div class="controls">
             <label class="checkbox">
-                <input type="checkbox" data-bind="checked: settings.upload_timelapse">{{ _('Upload timelapse videos to Polar Cloud.<BR>Requires GStreamer install, see <A href="https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md">README</A>.') }}
+                <input type="checkbox" data-bind="checked: settings.upload_timelapse">{{ _('Upload timelapse videos to Polar Cloud.<br>Requires GStreamer install, see <A href="https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md">README</A>.') }}
             </label>
         </div>
     </div>
@@ -60,6 +60,13 @@
         <div class="controls">
             <label class="checkbox">
                 <input type="checkbox" data-bind="checked: settings.enable_system_commands">{{ _('Allow Polar Cloud to send system commands to OctoPrint<br>It\'s those commands on the power button icon ') }}<i class="icon-off"></i>{{ _(' at the top.') }}
+            </label>
+        </div>
+    </div>
+    <div class="control-group">
+        <div class="controls">
+            <label class="checkbox">
+                <input type="checkbox" data-bind="visible: nextPrintAvailable, checked: settings.next_print">{{ _('Automatically start the next print from the queue.') }}
             </label>
         </div>
     </div>

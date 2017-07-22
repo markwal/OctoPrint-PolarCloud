@@ -30,7 +30,8 @@ $(function() {
         self.registering = ko.observable(false);
         self.registrationFailed = ko.observable(false);
         self.registrationFailedReason = ko.observable("");
-        self.printerTypes = ko.observableArray()
+        self.printerTypes = ko.observableArray();
+        self.nextPrintAvailable = ko.observable(false);
 
         self._ensureCurrentPrinterType = function() {
             if (self.printerTypes().indexOf(self.settings.printer_type()) < 0)
@@ -48,6 +49,13 @@ $(function() {
                     if ("printerMakes" in response) {
                         self.printerTypes(response["printerMakes"]);
                         self._ensureCurrentPrinterType();
+                    }
+                });
+            self.nextPrintAvailable(false);
+            OctoPrint.get("polarcloud")
+                .done(function(response) {
+                    if ("capabilities" in response && "sendNextPrint" in response["capabilities"]) {
+                        self.nextPrintAvailable(true);
                     }
                 });
         };

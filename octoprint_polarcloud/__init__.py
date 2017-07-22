@@ -139,6 +139,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._hello_sent = False
 		self._port = 80
 		self._octoprint_client = None
+		self._capabilities = None
+		self._next_pending = False
 
 		# consider temp reads higher than this as having a target set for more
 		# frequent reports
@@ -156,7 +158,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			max_image_size = 150000,
 			verbose=False,
 			upload_timelapse=True,
-			enable_system_commands=True
+			enable_system_commands=True,
+			next_print=True
 		)
 
 	def _update_local_settings(self):
@@ -174,8 +177,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	##~~ AssetPlugin mixin
 
 	def get_assets(self, *args, **kwargs):
-		# Define your plugin's asset files to automatically include in the
-		# core UI here.
 		return dict(
 			js=["js/polarcloud.js"],
 			css=["css/polarcloud.css"],
@@ -185,9 +186,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	##~~ Softwareupdate hook
 
 	def get_update_information(self, *args, **kwargs):
-		# Define the configuration for your plugin to use with the Software Update
-		# Plugin here. See https://github.com/foosel/OctoPrint/wiki/Plugin:-Software-Update
-		# for details.
 		return dict(
 			polarcloud=dict(
 				displayName="Polarcloud Plugin",
@@ -253,6 +251,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('disconnect', self._on_disconnect)
 		self._socket.on('registerResponse', self._on_register_response)
 		self._socket.on('welcome', self._on_welcome)
+		self._socket.on('capabilitiesResponse', self._on_capabilities_response)
 		self._socket.on('getUrlResponse', self._on_get_url_response)
 		self._socket.on('cancel', self._on_cancel)
 		self._socket.on('command', self._on_command)
@@ -343,6 +342,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		# wins, so we let _pstate show through if it "matches" current octoprint
 		if self._cloud_print:
 			if self._pstate_counter:
+				if self._next_pending and self._pstate == PSTATE_COMPLETE:
+					self._next_pending = False
+					self._task_queue.put(self._send_next_print)
 				# if we've got a counter, we're still repeating completion/cancel
 				# message, do that
 				self._pstate_counter -= 1
@@ -489,6 +491,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				if self._socket:
 					self._ensure_upload_url('idle')
 					self._custom_command_list()
+					self._capabilities()
 				skip_snapshot = False
 
 				while self._connected:
@@ -694,6 +697,24 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._challenge = None
 		else:
 			self._logger.debug('skip emit hello, serial: {}'.format(self._serial))
+
+	#~~ capabilities -> polar: capabilitiesResponse
+
+	def _on_capabilities_response(self, response, *args, **kwargs):
+		self._logger.debug('_on_capabilities_response: {}'.format(repr(response)))
+		if 'capabilities' in response:
+			self._capabilitites = response['capabilities']
+
+	def _capabilities(self):
+		self._socket.emit('capabilities', {
+			'serialNumber': self._serial,
+		})
+
+	#~~ _send_next_print(self):
+		if self._capabilities and 'sendNextPrint' in self._capabilities:
+			self._socket.emit('sendNextPrint', {
+				'serialNumber': self._serial
+			})
 
 	#~~ register -> polar: registerReponse
 
@@ -1038,6 +1059,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if self._cloud_print:
 				self._pstate = self.PSTATE_POSTPROCESSING
 				self._pstate_counter = 3
+				self._next_pending = True
 			self._job(self._job_id, "completed")
 		elif event == Events.SLICING_CANCELLED or event == Events.SLICING_FAILED:
 			self._pstate = self.PSTATE_CANCELLING
@@ -1104,6 +1126,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		else:
 			message = "Unable to understand command"
 		return flask.jsonify({'status': status, 'message': message})
+
+	def on_api_get(self, request):
+		#return flask.jsonify({'capabilities': self._capabilities})
+		return flask.jsonify({'capabilities': ['sendNextPrint']})
 
 	#~~ Slicing profile
 	def _create_slicing_profile(self, config_file_bytes):
