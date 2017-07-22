@@ -1128,8 +1128,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		return flask.jsonify({'status': status, 'message': message})
 
 	def on_api_get(self, request):
-		#return flask.jsonify({'capabilities': self._capabilities})
-		return flask.jsonify({'capabilities': ['sendNextPrint']})
+		return flask.jsonify({'capabilities': self._capabilities})
 
 	#~~ Slicing profile
 	def _create_slicing_profile(self, config_file_bytes):
