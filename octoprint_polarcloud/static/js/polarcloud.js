@@ -52,9 +52,9 @@ $(function() {
                     }
                 });
             self.nextPrintAvailable(false);
-            OctoPrint.get("polarcloud")
+            OctoPrint.simpleApiGet("polarcloud")
                 .done(function(response) {
-                    if ("capabilities" in response && "sendNextPrint" in response["capabilities"]) {
+                    if ("capabilities" in response && response["capabilities"].indexOf("sendNextPrint") >= 0) {
                         self.nextPrintAvailable(true);
                     }
                 });
@@ -62,7 +62,6 @@ $(function() {
 
         self.showRegistration = function() {
             self.emailAddress(self.settings.email());
-            console.log(JSON.stringify(self.emailAddress()));
             $("#plugin_polarcloud_registration").modal("show");
         };
 

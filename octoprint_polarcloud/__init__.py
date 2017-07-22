@@ -491,7 +491,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				if self._socket:
 					self._ensure_upload_url('idle')
 					self._custom_command_list()
-					self._capabilities()
+					self._send_capabilities()
 				skip_snapshot = False
 
 				while self._connected:
@@ -705,7 +705,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if 'capabilities' in response:
 			self._capabilitites = response['capabilities']
 
-	def _capabilities(self):
+	def _send_capabilities(self):
 		self._socket.emit('capabilities', {
 			'serialNumber': self._serial,
 		})

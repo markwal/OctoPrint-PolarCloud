@@ -63,10 +63,10 @@
             </label>
         </div>
     </div>
-    <div class="control-group">
+    <div class="control-group" data-bind="visible: nextPrintAvailable">
         <div class="controls">
             <label class="checkbox">
-                <input type="checkbox" data-bind="visible: nextPrintAvailable, checked: settings.next_print">{{ _('Automatically start the next print from the queue.') }}
+                <input type="checkbox" data-bind="checked: settings.next_print">{{ _('Automatically start the next print from the queue.') }}
             </label>
         </div>
     </div>
