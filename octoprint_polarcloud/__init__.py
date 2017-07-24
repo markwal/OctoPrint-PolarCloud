@@ -342,15 +342,20 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		# wins, so we let _pstate show through if it "matches" current octoprint
 		if self._cloud_print:
 			if self._pstate_counter:
-				if self._next_pending and self._pstate == PSTATE_COMPLETE:
+				if self._next_pending and self._pstate == self.PSTATE_COMPLETE:
 					self._next_pending = False
 					self._task_queue.put(self._send_next_print)
 				# if we've got a counter, we're still repeating completion/cancel
 				# message, do that
 				self._pstate_counter -= 1
+				pstate = self._pstate
 				if not self._pstate_counter:
-					self._cloud_print = False
-				return self._pstate
+					if self._pstate == self.PSTATE_POSTPROCESSING:
+						self._pstate = self.PSTATE_COMPLETE
+						self._pstate_counter = 3
+					else:
+						self._cloud_print = False
+				return pstate
 			if self._pstate == self.PSTATE_POSTPROCESSING:
 				return self._pstate
 
@@ -712,8 +717,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			'serialNumber': self._serial,
 		})
 
-	#~~ _send_next_print(self):
+	def _send_next_print(self):
+		self._logger.debug("_send_next_print")
 		if self._capabilities and 'sendNextPrint' in self._capabilities:
+			self._logger.debug("emit sendNextPrint")
 			self._socket.emit('sendNextPrint', {
 				'serialNumber': self._serial
 			})
