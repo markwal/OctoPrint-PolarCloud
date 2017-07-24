@@ -604,6 +604,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("_upload_timelapse")
 		self._pstate = self.PSTATE_COMPLETE
 		self._pstate_counter = 3
+		if not path:
+			return
 		if not self._ensure_upload_url('timelapse'):
 			self._logger.error("Unable to retrieve valid destination to upload timelapse {}".format(path))
 			return
@@ -1328,6 +1330,7 @@ class PolarTimelapseTranscoder(object):
 
 		except:
 			self._logger.exception("Could not render movie due to unknown error")
+			self._callback(None)
 
 __plugin_name__ = "PolarCloud"
 
