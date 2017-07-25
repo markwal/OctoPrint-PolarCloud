@@ -710,7 +710,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _on_capabilities_response(self, response, *args, **kwargs):
 		self._logger.debug('_on_capabilities_response: {}'.format(repr(response)))
 		if 'capabilities' in response:
-			self._capabilitites = response['capabilities']
+			self._capabilities = response['capabilities']
 
 	def _send_capabilities(self):
 		self._socket.emit('capabilities', {
@@ -718,8 +718,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		})
 
 	def _send_next_print(self):
-		self._logger.debug("_send_next_print")
-		if self._capabilities and 'sendNextPrint' in self._capabilities:
+		if self._capabilities and 'sendNextPrint' in self._capabilities and self._settings.get_boolean(['next_print']):
 			self._logger.debug("emit sendNextPrint")
 			self._socket.emit('sendNextPrint', {
 				'serialNumber': self._serial
