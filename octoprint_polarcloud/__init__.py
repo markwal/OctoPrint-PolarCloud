@@ -264,7 +264,11 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('customCommand', self._on_custom_command)
 
 	def _start_polar_status(self):
-		if not self._polar_status_worker:
+		if self._polar_status_worker:
+			# try to avoid a race by giving time for is_alive to become true for
+			# a just created thread
+			self._polar_status_worker.join(0.2)
+		if not self._polar_status_worker or not self._polar_status_worker.is_alive():
 			self._logger.debug("starting heartbeat")
 			self._polar_status_worker = threading.Thread(target=self._polar_status_heartbeat)
 			self._polar_status_worker.daemon = True
