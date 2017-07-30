@@ -4,7 +4,7 @@
 plugin_identifier = "polarcloud"
 plugin_package = "octoprint_polarcloud"
 plugin_name = "OctoPrint-PolarCloud"
-plugin_version = "1.1"
+plugin_version = "1.2"
 plugin_description = """Connects OctoPrint to the PolarCloud so you can easily monitor and control outside of your local network"""
 plugin_author = "Mark Walker"
 plugin_author_email = "markwal@hotmail.com"
