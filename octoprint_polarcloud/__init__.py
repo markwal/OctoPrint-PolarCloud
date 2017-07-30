@@ -141,6 +141,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._octoprint_client = None
 		self._capabilities = None
 		self._next_pending = False
+		self._print_preparer = None
 
 		# consider temp reads higher than this as having a target set for more
 		# frequent reports
@@ -672,7 +673,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if isinstance(self._challenge, unicode):
 				self._challenge = self._challenge.encode('utf-8')
 			self._task_queue.put(self._hello)
-			self._start_polar_status()
 
 	def _hello(self):
 		self._logger.debug('hello')
@@ -822,6 +822,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _on_print(self, data, *args, **kwargs):
 		if not self._valid_packet(data):
 			return
+		if self._print_preparer and self._print_preparer.is_alive():
+			self._logger.warn("PolarCloud sent a print command, but the plugin thinks we're still slicing.")
+			return
+
 		if self._printer.is_printing() or self._printer.is_paused():
 			self._logger.warn("PolarCloud sent print command, but OctoPrint is already printing.")
 			return
@@ -881,19 +885,17 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._status_now = True
 
 		if not gcode:
-			try:
-				self._file_manager.slice('cura',
-						FileDestinations.LOCAL, path,
-						FileDestinations.LOCAL, pathGcode,
-						position=pos, profile="polarcloud",
-						callback=self._on_slicing_complete,
-						callback_args=(self._file_manager.path_on_disk(FileDestinations.LOCAL, pathGcode),))
-			except:
-				self._logger.exception("Unable to slice.")
-				self._pstate = self.PSTATE_ERROR
-				self._pstate_counter = 3
+			self._print_preparer = PolarPrintPreparer(self._file_manager, path, 
+					pathGcode, pos, self._on_slicing_complete, self._on_slicing_failed)
+			self._print_preparer.prepare()
 		else:
 			self._on_slicing_complete(path)
+
+	def _on_slicing_failed(self, e):
+		self._logger.exception("Unable to slice.")
+		self._pstate = self.PSTATE_ERROR
+		self._pstate_counter = 3
+		self._print_preparer = None
 
 	def _on_slicing_complete(self, path, *args, **kwargs):
 		# TODO store self._cloud_print_info[sliceDetails]
@@ -902,6 +904,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._printer.select_file(path, False, printAfterSelect=True)
 		self._update_interval = 10
 		self._status_now = True
+		self._print_preparer = None
 
 	#~~ resume
 
@@ -1309,7 +1312,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ Timelapse
 
 class PolarTimelapseTranscoder(object):
-
 	def __init__(self, octoprint_movie, callback, logger):
 		self._octoprint_movie = octoprint_movie
 		movie_basename, ext = os.path.splitext(octoprint_movie)
@@ -1340,6 +1342,38 @@ class PolarTimelapseTranscoder(object):
 		except:
 			self._logger.exception("Could not render movie due to unknown error")
 			self._callback(None)
+
+	#~~ Slicing
+
+class PolarPrintPreparer(object):
+	def __init__(self, file_manager, path, pathGcode, pos, callback, callback_failed):
+		self._file_manager = file_manager
+		self._path = path
+		self._pathGcode = pathGcode
+		self._pos = pos
+		self._callback = callback
+		self._callback_failed = callback_failed
+		self._thread = None
+
+	def prepare(self):
+		self._thread = threading.Thread(target=self._preparation_worker)
+		self._thread.daemon = True
+		self._thread.start()
+
+	def is_alive(self):
+		return not self._thread or self._thread.is_alive()
+
+	# working thread for slicing
+	def _preparation_worker(self):
+		try:
+			self._file_manager.slice('cura',
+					FileDestinations.LOCAL, self._path,
+					FileDestinations.LOCAL, self._pathGcode,
+					position=self._pos, profile="polarcloud",
+					callback=self._callback,
+					callback_args=(self._file_manager.path_on_disk(FileDestinations.LOCAL, self._pathGcode),))
+		except:
+			self._callback_failed()
 
 __plugin_name__ = "PolarCloud"
 
