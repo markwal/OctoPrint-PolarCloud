@@ -151,6 +151,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._capabilities = None
 		self._next_pending = False
 		self._print_preparer = None
+		self._status = None
 
 		# consider temp reads higher than this as having a target set for more
 		# frequent reports
@@ -510,6 +511,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 				while self._connected:
 					status, target_set = self._current_status()
+					self._status = status
 					self._logger.debug("emit status: {}".format(repr(status)))
 					self._socket.emit("status", status)
 					status_sent += 1
@@ -1037,14 +1039,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug('job')
 		self._job_pending = False
 		if self._serial:
-			data = self._printer.get_current_data()
 			payload = {
 				'serialNumber': self._serial,
 				'jobId': job_id,
 				'state': state,
-				'filamentUsed': filament_length_from_job_data(data),
-				'printSeconds': str_safe_get(data, "progress", "printTime")
 			}
+			if self._status:
+				# send along the stats from the most recent status
+				payload['filamentUsed'] = self._status['filamentUsed']
+				payload['printSeconds'] = self._status['printSeconds']
 			self._logger.debug("job payload: {}".format(payload))
 			self._socket.emit('job', payload)
 		self._status_now = True
@@ -1084,10 +1087,14 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._pstate = self.PSTATE_POSTPROCESSING
 				self._pstate_counter = 3
 				self._next_pending = True
+			if self._status and "time" in payload:
+				self._status["printSeconds"] = payload["time"]
 			self._job(self._job_id, "completed")
 		elif event == Events.SLICING_CANCELLED or event == Events.SLICING_FAILED:
 			self._pstate = self.PSTATE_CANCELLING
 			self._pstate_counter = 3
+			if self._status and "time" in payload:
+				self._status["printSeconds"] = payload["time"]
 		elif event == Events.SETTINGS_UPDATED:
 			self._update_local_settings()
 			if (self._printer_type != self._settings.get(['printer_type'])):
