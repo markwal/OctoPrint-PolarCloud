@@ -100,7 +100,7 @@ With this dialog you can control the type of build plate (rectangular or circula
 
 > The Polar Cloud centers models at (0,0). Thus, when the resulting STL is sent to your printer, it is important to know where the origin of your printer's build plate is. If it is at a corner, the Cura "posx" and "posy" settings will be set, respectively, to half the build volume's X and Y lengths.
 
-> If you are using OctoPrint for the first time, be sure to set the [printer profile in OctoPrint as well](#OctoPrint-Printer-Profile).
+> If you are using OctoPrint for the first time, be sure to set the [printer profile in OctoPrint as well](#octoprint-printer-profile).
 
 Once you have made any adjustments to the settings, you can click "PREVIEW BUILD PLATE" button to see the adjusted build plate. Then click the "PRINTER" tab again to dismiss the dialog.
 
