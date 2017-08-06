@@ -94,6 +94,15 @@ def has_all(dictionary, *keys):
 			return False
 	return True
 
+# compute total filament length from all tools
+def filament_length_from_job_data(data):
+	filament_length = 0
+	if "job" in data and "filament" in data["job"] and isinstance(data["job"]["filament"], dict):
+		for tool, tool_info in data["job"]["filament"].items():
+			if "length" in tool_info:
+				filament_length += tool_info["length"]
+	return filament_length
+
 
 class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
                        octoprint.plugin.AssetPlugin,
@@ -430,12 +439,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			status["progressDetail"] = "Printing Job: {} Percent Complete: {:0.1f}%".format(
 				str_safe_get(data, 'file', 'name'), float_safe_get(data, 'progress', 'completion'))
 			status["estimatedTime"] = str_safe_get(data, "job", "estimatedPrintTime")
-			filament_length = 0
-			if "job" in data and "filament" in data["job"] and isinstance(data["job"]["filament"], dict):
-				for tool, tool_info in data["job"]["filament"].items():
-					if "length" in tool_info:
-						filament_length += tool_info["length"]
-			status["filamentUsed"] = filament_length
+			status["filamentUsed"] = filament_length_from_job_data(data)
 			status["printSeconds"] = str_safe_get(data, "progress", "printTime")
 			if status["printSeconds"]:
 				status["startTime"] = (datetime.datetime.now() -
@@ -1033,11 +1037,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug('job')
 		self._job_pending = False
 		if self._serial:
-			self._socket.emit('job', {
+			data = self._printer.get_current_data()
+			payload = {
 				'serialNumber': self._serial,
 				'jobId': job_id,
-				'state': state
-			})
+				'state': state,
+				'filamentUsed': filament_length_from_job_data(data),
+				'printSeconds': str_safe_get(data, "progress", "printTime")
+			}
+			self._logger.debug("job payload: {}".format(payload))
+			self._socket.emit('job', payload)
 		self._status_now = True
 
 	#~~ connectPrinter
