@@ -100,6 +100,8 @@ With this dialog you can control the type of build plate (rectangular or circula
 
 > The Polar Cloud centers models at (0,0). Thus, when the resulting STL is sent to your printer, it is important to know where the origin of your printer's build plate is. If it is at a corner, the Cura "posx" and "posy" settings will be set, respectively, to half the build volume's X and Y lengths.
 
+> If you are using OctoPrint for the first time, be sure to set the [printer profile in OctoPrint as well](#OctoPrint-Printer-Profile).
+
 Once you have made any adjustments to the settings, you can click "PREVIEW BUILD PLATE" button to see the adjusted build plate. Then click the "PRINTER" tab again to dismiss the dialog.
 
 Make changes to other slicer settings as necessary. <u>And adjust your starting and ending gcode under the "GCODE" tab</u>. When you are done, save your configuration by clicking the save icon,
@@ -115,3 +117,29 @@ By clicking on the vertical dots in the upper right of a job "tile", you can per
 ![Queued job actions](images/queued-job-options.png)
 
 When you edit a job, you can load additional models to it from various sources. You can even load models from another print job, thereby combing two jobs into one.
+
+## OctoPrint Printer Profile
+
+OctoPrint has a printer profile as well which needs to be set up to match your printer.  If you have already done
+this, then you can skip this step.  Otherwise, read on.
+
+To access the printer profiles in OctoPrint, click the "Settings" icon near the top right of the OctoPrint web
+interface as shown in the image below:
+
+![OctoPrint settings](images/octoprint-settings.png)
+
+> **Tip**: when you are viewing the Polar Cloud in your web browser and you are on the same local network as your
+> OctoPrint server, then you can access the OctoPrint web pages from the Polar Cloud.  Navigate to your printer
+> dashboard and click the "Local UI" button near the upper right.  That button only appears for the owner and
+> managers of the printer.
+
+From the OctoPrint settings, select the "Printer Profiles" menu from the list of choices on the far left of the
+OctoPrint web pages:
+
+![OctoPrint settings](images/octoprint-printer-profiles-1.png)
+
+Then, from the pop-up window click the "pencil" icon on the right under the "Action" column.
+That will bring up another window in which you can set printer characteristics such as the
+build plate geometry.  Once the desired settings have been made, click the "CONFIRM" button
+on the lower right.  Then click the "SAVE" button in the lower right of the "Printer Profiles"
+window.  Once you've done that, you've now configured your machine definitions in OctoPrint.
