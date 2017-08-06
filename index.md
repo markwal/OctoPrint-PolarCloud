@@ -140,6 +140,10 @@ OctoPrint web pages:
 
 Then, from the pop-up window click the "pencil" icon on the right under the "Action" column.
 That will bring up another window in which you can set printer characteristics such as the
-build plate geometry.  Once the desired settings have been made, click the "CONFIRM" button
+build plate geometry:
+
+![OctoPrint settings](images/octoprint-printer-profiles-2.png)
+
+Once the desired settings have been made, click the "CONFIRM" button
 on the lower right.  Then click the "SAVE" button in the lower right of the "Printer Profiles"
 window.  Once you've done that, you've now configured your machine definitions in OctoPrint.
