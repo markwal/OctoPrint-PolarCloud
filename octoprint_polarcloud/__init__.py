@@ -540,6 +540,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				if status_sent < 3 and not self._disconnect_on_register:
 					self._logger.warn("Unable to connect to Polar Cloud")
 					break
+				self._socket = None
 				self._logger.debug("bottom of forever")
 
 		except:
