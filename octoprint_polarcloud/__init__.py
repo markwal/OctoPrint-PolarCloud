@@ -490,12 +490,17 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			while True:
 				self._logger.debug("self._socket: {}".format(repr(self._socket)))
 				if self._socket:
+					self._logger.debug("_wait_and_process")
 					_wait_and_process(10)
 				else:
 					reconnection_delay = random.uniform(1.5, 3)
 					self._logger.warn("unable to create socket to Polar Cloud, check again in {} seconds".format(reconnection_delay))
-					sleep(reconnection_delay)
-					self._create_socket()
+					try:
+						sleep(reconnection_delay)
+						self._create_socket()
+						self._logger.info("Socket created.")
+					except:
+						self._logger.exception("Something went wrong trying to create the socket.")
 
 				# wait until we get a hello
 				if not self._hello_sent:
@@ -825,6 +830,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._status_now = True
 
 	#~~ print
+	def _get_slicer_name(self):
+		slicer = 'cura'
+		if 'Printrbelt' in self._printer_type:
+			printrbelt_slicer = 'printrbelt-cura'
+			try:
+				self._slicing_manager.get_slicer(printrbelt_slicer)
+				slicer = printrbelt_slicer
+			except (UnknownSlicer, SlicerNotConfigured):
+				pass
+		return slicer
 
 	def _on_print(self, data, *args, **kwargs):
 		if not self._valid_packet(data):
@@ -845,6 +860,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		info = {}
 		gcode = (".gcode" in data['stlFile'].lower())
 		pos = (0, 0)
+		slicer = 'cura'
 		if not gcode:
 			if not 'configFile' in data:
 				self._logger.warn("PolarCloud sent print command without slicing profile.")
@@ -856,7 +872,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			except Exception:
 				self._logger.exception("Could not retrieve slicer config file from PolarCloud: {}".format(data['configFile']))
 				return
-			(slicing_profile, pos) = self._create_slicing_profile(req_ini.content)
+			slicer = self._get_slicer_name()
+			(slicing_profile, pos) = self._create_slicing_profile(slicer, req_ini.content)
 			if not slicing_profile:
 				self._logger.warn("Unable to create slicing profile. Aborting slice and print.")
 				return
@@ -892,8 +909,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._status_now = True
 
 		if not gcode:
-			self._print_preparer = PolarPrintPreparer(self._file_manager, path, 
-					pathGcode, pos, self._on_slicing_complete, self._on_slicing_failed)
+			self._print_preparer = PolarPrintPreparer(slicer,
+					self._file_manager, path, pathGcode, pos,
+					self._on_slicing_complete, self._on_slicing_failed,
+					self._logger)
 			self._print_preparer.prepare()
 		else:
 			self._on_slicing_complete(path)
@@ -1163,7 +1182,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		return flask.jsonify({'capabilities': self._capabilities})
 
 	#~~ Slicing profile
-	def _create_slicing_profile(self, config_file_bytes):
+	def _create_slicing_profile(self, slicer, config_file_bytes):
 
 		class ConfigFileReader(StringIO, object):
 			def __init__(self, *args, **kwargs):
@@ -1317,9 +1336,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug("Profile looks like this: {}".format(repr(profile)))
 		profile["fan_enabled"] = "fan_speed_max" in profile and profile["fan_speed_max"] > 0
 
-		profile = self._slicing_manager.save_profile("cura", "polarcloud", profile,
-				allow_overwrite=True, display_name="PolarCloud",
-				description="Polar Cloud sends this slicing profile down with each cloud print (overwritten each time)")
+		try:
+			profile = self._slicing_manager.save_profile(slicer, "polarcloud", profile,
+					allow_overwrite=True, display_name="PolarCloud",
+					description="Polar Cloud sends this slicing profile down with each cloud print (overwritten each time)")
+		except:
+			self._logger.exception("save_profile failed")
+			profile = None
 		return (profile, (posx, posy))
 
 	def strip_ignore(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
@@ -1363,13 +1386,15 @@ class PolarTimelapseTranscoder(object):
 	#~~ Slicing
 
 class PolarPrintPreparer(object):
-	def __init__(self, file_manager, path, pathGcode, pos, callback, callback_failed):
+	def __init__(self, slicer, file_manager, path, pathGcode, pos, callback, callback_failed, logger):
+		self._slicer = slicer
 		self._file_manager = file_manager
 		self._path = path
 		self._pathGcode = pathGcode
 		self._pos = pos
 		self._callback = callback
 		self._callback_failed = callback_failed
+		self._logger = logger
 		self._thread = None
 
 	def prepare(self):
@@ -1383,13 +1408,14 @@ class PolarPrintPreparer(object):
 	# working thread for slicing
 	def _preparation_worker(self):
 		try:
-			self._file_manager.slice('cura',
+			self._file_manager.slice(self._slicer,
 					FileDestinations.LOCAL, self._path,
 					FileDestinations.LOCAL, self._pathGcode,
 					position=self._pos, profile="polarcloud",
 					callback=self._callback,
 					callback_args=(self._file_manager.path_on_disk(FileDestinations.LOCAL, self._pathGcode),))
 		except:
+			self._logger.exception("_file_manager.slice failed")
 			self._callback_failed()
 
 __plugin_name__ = "PolarCloud"
