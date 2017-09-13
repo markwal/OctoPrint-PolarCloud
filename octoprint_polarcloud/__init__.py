@@ -1297,7 +1297,23 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"supportzdistance":     ("support_z_distance", mm_from_um),
 			"supportlinedistance":  ("support_fill_rate",  lambda x: 100.0 * extrusion_width / mm_from_um(x)),
 			"startcode":            ("start_gcode",        lambda x: ["(@ignore {print_temperature})\n(@ignore {print_bed_temperature})\n" + x[3:-3]]),
-			"endcode":              ("end_gcode",          lambda x: [x[3:-3]])
+			"endcode":              ("end_gcode",          lambda x: [x[3:-3]]),
+			"raftmargin":           ("raft_margin",        mm_from_um),
+			"raftlinespacing":      ("raft_line_spacing",  mm_from_um),
+			"raftbasethickness":    ("raft_base_thickness",mm_from_um),
+			"raftbaselinewidth":    ("raft_base_linewidth",mm_from_um),
+			"raftinterfacethickness": ("raft_thickness",   mm_from_um),
+			"raftinterfacelinewidth": ("raft_margin",      mm_from_um),
+			"raftinterfacelinespacing": (None, None),      # octoprint computes from linewidth
+			"raftbasespeed":        (None, None),          # octoprint always uses bottom_layer_speed
+			"raftfanspeed":         (None, None),          # octoprint forces this to 0
+			"raftsurfacethickness": ("raft_surface_thickness", mm_from_um),
+			"raftsurfacelinewidth": ("raft_surface_linewidth", mm_from_um),
+			"raftsurfacelinespacing": (None, None),        # octoprint computes from linewidth
+			"raftsurfacelayers":    ("raft_surface_layers",no_translation),
+			"raftsurfacespeed":     (None, None),          # octoprint always uses bottom_layer_speed
+			"raftairgap":           ("raft_airgap_all",    mm_from_um),
+			"raftairgaplayer0":     (None, None)           # octoprint doesn't support a different airgap for layer0)
 		}
 
 		profile = dict()
@@ -1319,6 +1335,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				key, translate = profile_from_engine_config[option]
 				if key:
 					profile[key] = translate(value)
+					if "raft" in key:
+						profile["platform_adhesion"] = "raft"
 				else:
 					self._logger.debug("Eating PolarCloud setting {}={}".format(option, value))
 			elif option == "fixhorrible":
