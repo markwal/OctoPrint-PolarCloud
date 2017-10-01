@@ -842,6 +842,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		return slicer
 
 	def _on_print(self, data, *args, **kwargs):
+		self._logger.debug("on_print {0}".format(repr(data)))
 		if not self._valid_packet(data):
 			return
 		if self._print_preparer and self._print_preparer.is_alive():
@@ -853,15 +854,22 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 
 		self._job_id = "123"
-		if not 'stlFile' in data:
-			self._logger.warn("PolarCloud sent print command without stl file path.")
+		gcode = False
+		print_file = ''
+		if 'gcodeFile' in data:
+			gcode = True
+			print_file = data['gcodeFile']
+		elif 'stlFile' in data:
+			print_file = data['stlFile']
+		else:
+			self._logger.warn("PolarCloud sent print command without a print file path.")
 			return
 
 		info = {}
-		gcode = (".gcode" in data['stlFile'].lower())
 		pos = (0, 0)
 		slicer = 'cura'
 		if not gcode:
+			# need to slice then, so make sure we're set up to do that
 			if not 'configFile' in data:
 				self._logger.warn("PolarCloud sent print command without slicing profile.")
 				return
@@ -880,11 +888,11 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		# TODO: use tornado async I/O to get the print file?
 		try:
-			info['file'] = data['stlFile']
-			req_stl = requests.get(data['stlFile'], timeout=5)
+			info['file'] = print_file
+			req_stl = requests.get(print_file, timeout=5)
 			req_stl.raise_for_status()
 		except Exception:
-			self._logger.exception("Could not retrieve print file from PolarCloud: {}".format(data['stlFile']))
+			self._logger.exception("Could not retrieve print file from PolarCloud: {}".format(print_file))
 			return
 
 		path = self._file_manager.add_folder(FileDestinations.LOCAL, "polarcloud")
@@ -909,6 +917,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._status_now = True
 
 		if not gcode:
+			# prepare the gcode file by slicing
 			self._print_preparer = PolarPrintPreparer(slicer,
 					self._file_manager, path, pathGcode, pos,
 					self._on_slicing_complete, self._on_slicing_failed,
