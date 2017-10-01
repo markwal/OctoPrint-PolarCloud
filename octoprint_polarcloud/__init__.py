@@ -924,7 +924,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					self._logger)
 			self._print_preparer.prepare()
 		else:
-			self._on_slicing_complete(path)
+			self._on_slicing_complete(self._file_manager.path_on_disk(FileDestinations.LOCAL, path))
 
 	def _on_slicing_failed(self, e):
 		self._logger.exception("Unable to slice.")
