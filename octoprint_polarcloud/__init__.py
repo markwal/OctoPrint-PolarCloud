@@ -422,12 +422,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			status['targetTool0'] = temps['tool0']['target']
 			if status['targetTool0'] > 0 or status['tool0'] > self._set_temp_threshold:
 				target_set = True
-		if 'tool1' in temps:
+		if 'tool1' in temps and not (temps['tool1']['actual'] == -1 and temps['tool1']['target'] == 0):
 			status['tool1'] = temps['tool1']['actual']
 			status['targetTool1'] = temps['tool1']['target']
 			if status['targetTool1'] > 0 or status['tool1'] > self._set_temp_threshold:
 				target_set = True
-		if 'bed' in temps:
+		if 'bed' in temps and not (temps['bed']['actual'] == -1 and temps['bed']['target'] == 0):
 			status['bed'] = temps['bed']['actual']
 			status['targetBed'] = temps['bed']['target']
 			if status['targetBed'] > 0 or status['bed'] > self._set_temp_threshold:
@@ -483,7 +483,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		try:
 			self._logger.debug("heartbeat")
 			random.seed()
-			next_check_versions = datetime.datetime.now() 
+			next_check_versions = datetime.datetime.now()
 			status_sent = 0
 			self._create_socket()
 
@@ -1456,4 +1456,3 @@ def __plugin_load__():
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
 		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.strip_ignore
 	}
-
