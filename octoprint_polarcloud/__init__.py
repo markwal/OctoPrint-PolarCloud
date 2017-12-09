@@ -1280,7 +1280,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"infillpattern":        (None, None),          # octoprint doesn't set
 			"layer0extrusionwidth": ("first_layer_width_factor", lambda x: mm_from_um(x) * 100.0 / extrusion_width),
 			"spiralizemode":        ("spiralize",          bool_from_int),
-			"supporteverywhere":    ("support",            lambda x: "everywhere" if x else "none") ,
 			"sparseinfilllinedistance": ("fill_density",   lambda x: 100.0 * extrusion_width / mm_from_um(x)),
 			"multivolumeoverlap":   ("overlap_dual",       mm_from_um),
 			"enableoozeshield":     ("ooze_shield",        bool_from_int),
@@ -1292,7 +1291,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"extruderoffset[0].y":  (None, None),          # octoprint always overrides with printer profile
 			"retractionminimaldistance": ("retraction_min_travel", mm_from_um),
 			"retractionzhop":       ("retraction_hop",     mm_from_um),
-			"minimalextrusionbeforeretraction": ("rectraction_minimal_extrusion", mm_from_um),
+			"minimalextrusionbeforeretraction": ("retraction_minimal_extrusion", mm_from_um),
 			"enablecombing":        ("retraction_combing", lambda x: "all" if x == 1 else ("no skin" if x == 2 else "off")),
 			"minimalfeedrate":      ("cool_min_feedrate",  no_translation),
 			"coolheadlift":         ("cool_head_lift",     bool_from_int),
@@ -1326,6 +1325,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		}
 
 		profile = dict()
+		profile["support"] = "none"
 		posx = 0
 		posy = 0
 		for option in config.options("x"):
@@ -1346,8 +1346,14 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					profile[key] = translate(value)
 					if "raft" in key:
 						profile["platform_adhesion"] = "raft"
+					elif "support" in key:
+						if profile["support"] != "everywhere":
+							profile["support"] = "buildplate"
 				else:
 					self._logger.debug("Eating PolarCloud setting {}={}".format(option, value))
+			elif option == "supporteverywhere":
+				if value:
+					profile["support"] = "everywhere"
 			elif option == "fixhorrible":
 				profile["fix_horrible_union_all_type_a"] = not not (value & 0x01)
 				profile["fix_horrible_union_all_type_b"] = not not (value & 0x02)
