@@ -20,6 +20,7 @@ plugin uses GStreamer.  To install GStreamer and the necessary plugins, use the
 following command line:
 
 ```
+sudo apt-get update
 sudo apt install gstreamer1.0-tools libx264-dev gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
 ```
 
