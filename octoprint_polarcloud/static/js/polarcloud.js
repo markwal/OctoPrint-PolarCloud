@@ -80,7 +80,8 @@ $(function() {
             }, 10000);
             OctoPrint.simpleApiCommand("polarcloud", "register", {
                 "email": self.emailAddress(),
-                "pin": self.pin()
+                "pin": self.pin(),
+                "printer_type": self.settings.printer_type()
             }).done(function(response) {
                 console.log("polarcloud register response" + JSON.stringify(response));
             });

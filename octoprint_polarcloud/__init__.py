@@ -1178,6 +1178,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		status='FAIL'
 		message=''
 		if command == 'register' and 'email' in data and 'pin' in data:
+			if 'printer_type' in data:
+				self._printer_type = data['printer_type']
+				self._settings.set(['printer_type'], self._printer_type)
 			if self._register(data['email'], data['pin']):
 				status = 'WAIT'
 				message = "Waiting for response from Polar Cloud"
