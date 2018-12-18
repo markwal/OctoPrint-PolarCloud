@@ -350,7 +350,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"TRANSFERING_FILE": self.PSTATE_SERIAL,
 			"OFFLINE": self.PSTATE_OFFLINE,
 			"UNKNOWN": self.PSTATE_ERROR,
-			"NONE": self.PSTATE_ERROR
+			"NONE": self.PSTATE_ERROR,
+			"FINISHING": self.PSTATE_POSTPROCESSING
 		}
 		# this is a bit complicated because the mapping isn't direct and while
 		# we try to keep track of current polar state, current octoprint state
@@ -375,7 +376,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				return self._pstate
 
 		self._logger.debug("OctoPrint state: {}".format(self._printer.get_state_id()))
-		state = state_mapping[self._printer.get_state_id()]
+		state_id = self._printer.get_state_id()
+		state = self.PSTATE_ERROR
+		try:
+			state = state_mapping[state_id]
+		except KeyError:
+			self._logger.exception("Unknown OctoPrint status, mapping to error state for PolarCloud: {}".format(state_id))
 
 		if state == self.PSTATE_SERIAL:
 			# if we were ever printing, we owe a "job" completion message
@@ -387,8 +393,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if state == self.PSTATE_SERIAL:
 				# octoprint thinks we're printing
 				return self.PSTATE_PRINTING
-			if state != self.PSTATE_PAUSED:
-				# if we aren't preparing, printing or paused and we're not
+			if state != self.PSTATE_PAUSED and state != self.PSTATE_POSTPROCESSING:
+				# if we aren't preparing, printing, finished or paused and we're not
 				# counting down anymore, we must really be done
 				self._cloud_print = False
 				self._job_id = "123"
