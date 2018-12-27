@@ -273,6 +273,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('update', self._on_update)
 		self._socket.on('connectPrinter', self._on_connect_printer)
 		self._socket.on('customCommand', self._on_custom_command)
+		self._socket.on('jogPrinter', sef._on_jog_printer)
 
 	def _start_polar_status(self):
 		if self._polar_status_worker:
@@ -1040,6 +1041,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
 		except Exception:
 			self._logger.exception("Could not execute system command: {}".format(repr(data)))
+
+
+	#~~ jogPrinter
+
+	def _on_jog_printer(self, data, *args, **kwargs):
+		r = client.post("/api/printer/printHead/", data)
+		r.raise_for_status()
+		self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
+
 
 	#~~ setVersion
 
