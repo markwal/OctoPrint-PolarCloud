@@ -1053,9 +1053,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
         # the JSON object that the Octopi API is expecting
         jog_data = data['jogPrinter']
         api_command = ""
-        if jog_data['command'] == 'extrude'
+        if jog_data['command'] == 'extrude':
             api_command = "tool"
-        else
+        else:
             api_command = "printHead"
 
         r = client.post("/api/printer/" + api_command  + "/", jog_data)
