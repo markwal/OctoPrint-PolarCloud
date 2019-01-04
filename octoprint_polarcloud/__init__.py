@@ -1054,7 +1054,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		# The data object should have a jogPrinter field which containts
 		# the JSON object that the Octopi API is expecting
 		jog_data = data['jogPrinter']
-		self._logger.warn("Jog command: {}".format(repr(jog_data)))
+		self._logger.debug("Jog command: {}".format(repr(jog_data)))
 		api_command = "printhead"
 		if jog_data['command'] == 'extrude':
 			api_command = "tool"
@@ -1062,7 +1062,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		client = self._ensure_octoprint_client()
 		r = client.post_json("/api/printer/" + api_command, data['jogPrinter'])
 		r.raise_for_status()
-		self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
 
 
 	#~~ setVersion
