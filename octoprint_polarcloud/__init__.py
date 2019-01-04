@@ -162,7 +162,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def get_settings_defaults(self, *args, **kwargs):
 		return dict(
 			service="https://printer2.polar3d.com",
-			service_ui="https://polar3d.com",
+			service_ui="https://pc2-dev.polar3d.com",
 			serial=None,
 			printer_type="Cartesian",
 			email="",
@@ -1036,6 +1036,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._logger.warn("Ignoring custom command, no 'command' element: {}".format(repr(data)))
 				return
 			client = self._ensure_octoprint_client()
+
+
 			r = client.post("/api/system/commands/" + data['command'], {})
 			r.raise_for_status()
 			self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
@@ -1053,12 +1055,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
         	# the JSON object that the Octopi API is expecting
         	jog_data = data['jogPrinter']
         	api_command = ""
+		self._logger.warn("Jog request...")
+		self._logger.warn("Jog command: {}".format(jog_data))
         	if jog_data['command'] == 'extrude':
             		api_command = "tool"
         	else:
-            		api_command = "printHead"
+            		api_command = "printhead"
 
-        	r = client.post("/api/printer/" + api_command  + "/", jog_data)
+        	client = self._ensure_octoprint_client()
+		r = client.post("/api/printer/" + api_command, str(data['jogPrinter']))
 		r.raise_for_status()
 		self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
 
