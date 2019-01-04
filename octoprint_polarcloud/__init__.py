@@ -1037,7 +1037,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				return
 			client = self._ensure_octoprint_client()
 
-
 			r = client.post("/api/system/commands/" + data['command'], {})
 			r.raise_for_status()
 			self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
@@ -1061,7 +1060,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			api_command = "tool"
 
 		client = self._ensure_octoprint_client()
-		r = client.post("/api/printer/" + api_command, data['jogPrinter'])
+		r = client.post_json("/api/printer/" + api_command, data['jogPrinter'])
 		r.raise_for_status()
 		self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
 
