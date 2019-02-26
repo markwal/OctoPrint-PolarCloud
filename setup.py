@@ -10,7 +10,7 @@ plugin_author = "Mark Walker"
 plugin_author_email = "markwal@hotmail.com"
 plugin_url = "https://github.com/markwal/OctoPrint-PolarCloud"
 plugin_license = "AGPLv3"
-plugin_requires = ["cffi==1.11.5", "cryptography==2.2.2", "SocketIO-client", "pyopenssl", "Pillow"]
+plugin_requires = ["SocketIO-client", "pyopenssl"]
 
 ### --------------------------------------------------------------------------------------------------------------------
 ### More advanced options that you usually shouldn't have to touch follow after this point
@@ -38,7 +38,6 @@ plugin_ignored_packages = []
 #     additional_setup_parameters = {"dependency_links": ["https://github.com/someUser/someRepo/archive/master.zip#egg=someDependency-dev"]}
 #"dependency_links": ["https://www.dropbox.com/sh/jz5kduz7v6iuqwv/AAB-2vwh0R1_Bkyf_0YSHtz6a?dl=0"]
 additional_setup_parameters = {
-		"dependency_links": ["https://markwal.github.io/wheels/"]
 	}
 
 ########################################################################################################################
@@ -52,6 +51,28 @@ except:
 	      "the same python installation that OctoPrint is installed under?")
 	import sys
 	sys.exit(-1)
+
+	add_pillow = True
+try:
+	import sys
+	import sysconfig
+	import distutils.util
+
+	plat = distutils.util.get_platform().replace('.', '_').replace('-', '_')
+	if plat in ['linux_armv7l', 'linux_armv6l'] and not hasattr(sys, 'pypy_version_info'):
+		plugin_requires = [
+			"cryptography @ https://markwal.github.io/wheelhouse/cryptography-2.5-cp27-none-" + plat + ".whl",
+			"cffi @ https://markwal.github.io/wheelhouse/cffi-1.12.1-cp27-none-" + plat + ".whl",
+			"Pillow @ https://markwal.github.io/wheelhouse/Pillow-5.4.1-cp27-none-" + plat + ".whl",
+		] + plugin_requires
+		add_pillow = False
+except:
+	import traceback
+	traceback.print_exc()
+	print("Unable to import Raspberry Pi wheels due to exception, building the slow way.")
+
+if add_pillow:
+	plugin_requires = ["Pillow"] + plugin_requires
 
 setup_parameters = octoprint_setuptools.create_plugin_setup_parameters(
 	identifier=plugin_identifier,
