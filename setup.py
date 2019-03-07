@@ -52,7 +52,7 @@ except:
 	import sys
 	sys.exit(-1)
 
-	add_pillow = True
+add_pillow = True
 try:
 	import sys
 	import sysconfig
