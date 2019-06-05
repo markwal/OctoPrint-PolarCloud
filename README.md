@@ -13,6 +13,12 @@ This may take a long while, especially if your platform needs to install and
 compile the cryptography package. It should be a reasonable wait on a Raspberry
 Pi Zero, 2 or 3 though.
 
+## Install CuraEngine Legacy plugin
+
+Octoprint newer than version 1.3.10 requires that the CuraEngine Legacy slicing
+plugin be installed. If running the Polar Cloud Plugin 1.9 or newer, CuraEngine
+Legacy slicer needs to be installed.
+
 ## Enable Polar Cloud timelapses
 
 To create timelapse movies in the format required by the Polar Cloud, the
@@ -47,7 +53,8 @@ printer with your PolarCloud user account.
 ## Notes and Limitations
 
 * Printing from the cloud requires the CuraEngine path to be set properly in
-  the Cura slicer plugin (octopi has this set up already).
+  the CuraEngine Legacy slicer plugin. A different CuraEngine plugin is installed by default in Octoprint prior to version 1.3.10. The latest version of the
+  Polar Cloud Plugin requires that the CuraEngine Legacy slicer is installed.
 * If you have a camera configured with OctoPrint you presently need to configure
   OctoPrint to use an absolute URL rather than a relative URL.  This so that the
   Polar Cloud's web interface can display the live camera feed in your web browser

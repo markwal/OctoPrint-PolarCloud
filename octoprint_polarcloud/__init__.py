@@ -838,7 +838,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	#~~ print
 	def _get_slicer_name(self):
-		slicer = 'cura'
+		slicer = 'curalegacy'
 		if 'Printrbelt' in self._printer_type:
 			printrbelt_slicer = 'printrbelt-cura'
 			try:
@@ -874,7 +874,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		info = {}
 		pos = (0, 0)
-		slicer = 'cura'
+		slicer = 'curalegacy'
 		if not gcode:
 			# need to slice then, so make sure we're set up to do that
 			if not 'configFile' in data:
