@@ -29,13 +29,19 @@ import stat
 import threading
 import logging
 import uuid
-import Queue
+try:
+	import queue
+except ImportError:
+	import Queue as queue
 import base64
 import datetime
 from time import sleep
-from StringIO import StringIO
 import io
-from urlparse import urlparse, urlunparse
+from io import BytesIO
+try:
+	from urllib.parse import urlparse, urlunparse
+except ImportError:
+	from urlparse import urlparse, urlunparse
 import random
 import re
 import json
@@ -131,7 +137,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._connected = False
 		self._status_now = False
 		self._challenge = None
-		self._task_queue = Queue.Queue()
+		self._task_queue = queue.Queue()
 		self._polar_status_worker = None
 		self._upload_location = {}
 		self._update_interval = 60
@@ -467,7 +473,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						try:
 							task = self._task_queue.get_nowait()
 							task()
-						except Queue.Empty:
+						except queue.Empty:
 							pass
 					if not ignore_status_now and self._status_now:
 						self._status_now = False
@@ -601,7 +607,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			image_size = len(image_bytes)
 			if self._image_transpose or image_size > self._max_image_size:
 				self._logger.debug("Recompressing snapshot to smaller size")
-				buf = StringIO()
+				buf = BytesIO()
 				buf.write(image_bytes)
 				image = Image.open(buf)
 				image.thumbnail((640, 480))
@@ -611,7 +617,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					image = image.transpose(Image.FLIP_TOP_BOTTOM)
 				if self._settings.global_get(["webcam", "rotate90"]):
 					image = image.transpose(Image.ROTATE_90)
-				image_bytes = StringIO()
+				image_bytes = BytesIO()
 				image.save(image_bytes, format="jpeg")
 				image_bytes.seek(0, 2)
 				new_image_size = image_bytes.tell()
@@ -689,7 +695,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug('_on_welcome: {}'.format(repr(welcome)))
 		if 'challenge' in welcome:
 			self._challenge = welcome['challenge']
-			if isinstance(self._challenge, unicode):
+			if not isinstance(self._challenge, bytes):
 				self._challenge = self._challenge.encode('utf-8')
 			self._task_queue.put(self._hello)
 
@@ -1484,6 +1490,7 @@ class PolarPrintPreparer(object):
 			self._callback_failed()
 
 __plugin_name__ = "PolarCloud"
+__plugin_pythoncompat__ = ">=2.7,<4"
 
 def __plugin_load__():
 	global __plugin_implementation__
