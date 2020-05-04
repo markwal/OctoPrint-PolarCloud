@@ -50,7 +50,7 @@ from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
 import sarge
 import flask
-from flask.ext.babel import gettext, _
+from flask_babel import gettext, _
 import requests
 from PIL import Image
 
@@ -722,7 +722,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				transformImg += 4
 			self._socket.emit('hello', {
 				'serialNumber': self._serial,
-				'signature': base64.b64encode(crypto.sign(self._key, self._challenge, b'sha256')),
+				'signature': base64.b64encode(crypto.sign(self._key, self._challenge, 'sha256')).decode('utf-8'),
 				'MAC': get_mac(),
 				'localIP': get_ip(),
 				'protocol': '2',
