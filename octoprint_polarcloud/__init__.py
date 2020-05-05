@@ -483,14 +483,17 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					if not self._connected:
 						self._socket = None
 						return False
+					if self._shutdown:
+						return False
 				return True
 			except:
-				if not self._connected:
-					# likely throw from disconnect
-					self._socket = None
-				else:
-					self._logger.exception("polar_heartbeat exception")
-					sleep(5)
+				if not self._shutdown:
+					if not self._connected:
+						# likely throw from disconnect
+						self._socket = None
+					else:
+						self._logger.exception("polar_heartbeat exception")
+						sleep(5)
 				return False
 
 		try:
@@ -499,8 +502,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			next_check_versions = datetime.datetime.now()
 			status_sent = 0
 			self._create_socket()
+			self._shutdown = False
 
-			while True:
+			while not self._shutdown:
 				self._logger.debug("self._socket: {}".format(repr(self._socket)))
 				if self._socket:
 					self._logger.debug("_wait_and_process")
@@ -527,7 +531,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					self._send_capabilities()
 				skip_snapshot = False
 
-				while self._connected:
+				while self._connected and not self._shutdown:
 					status, target_set = self._current_status()
 					self._status = status
 					self._logger.debug("emit status: {}".format(repr(status)))
@@ -894,8 +898,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._logger.exception("Could not retrieve slicer config file from PolarCloud: {}".format(data['configFile']))
 				return
 			slicer = self._get_slicer_name()
-			(slicing_profile, pos) = self._create_slicing_profile(slicer, req_ini.content)
-			if not slicing_profile:
+			slicing_profile = None
+			try:
+				(slicing_profile, pos) = self._create_slicing_profile(slicer, req_ini.content)
+			except (UnknownSlicer, SlicerNotConfigured):
+				#TODO tell PolarCloud that we don't have a slicer so it can tell the user
+				pass
+			if slicing_profile is None:
 				self._logger.warn("Unable to create slicing profile. Aborting slice and print.")
 				return
 
@@ -1188,6 +1197,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			else:
 				self._pstate = self.PSTATE_COMPLETE
 				self._pstate_counter = 3
+		elif event == Events.SHUTDOWN:
+			self._shutdown = True
+			return
 		elif hasattr(Events, 'PRINTER_STATE_CHANGED') and event == Events.PRINTER_STATE_CHANGED:
 			self._status_now = True
 			return
@@ -1231,7 +1243,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ Slicing profile
 	def _create_slicing_profile(self, slicer, config_file_bytes):
 
-		class ConfigFileReader(StringIO, object):
+		class ConfigFileReader(BytesIO, object):
 			def __init__(self, *args, **kwargs):
 				self._dummy_section = True
 				self._indent = False
