@@ -29,6 +29,7 @@ import stat
 import threading
 import logging
 import uuid
+from functools import reduce
 try:
 	import queue
 except ImportError:
@@ -37,7 +38,7 @@ import base64
 import datetime
 from time import sleep
 import io
-from io import BytesIO
+from io import StringIO, BytesIO
 try:
 	from urllib.parse import urlparse, urlunparse
 except ImportError:
@@ -61,6 +62,7 @@ from octoprint.util import get_exception_string
 from octoprint.events import Events
 from octoprint.filemanager import FileDestinations
 from octoprint.filemanager.util import StreamWrapper
+from octoprint.slicing.exceptions import UnknownSlicer, SlicerNotConfigured
 
 # logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
 # logging.basicConfig()
@@ -531,7 +533,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					self._send_capabilities()
 				skip_snapshot = False
 
-				while self._connected and not self._shutdown:
+				while self._connected:
 					status, target_set = self._current_status()
 					self._status = status
 					self._logger.debug("emit status: {}".format(repr(status)))
@@ -557,6 +559,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						else:
 							skip_snapshot = False
 						self._upload_snapshot()
+					if self._shutdown:
+						return
 
 				self._logger.info("Socket disconnected, clear and restart")
 				if status_sent < 3 and not self._disconnect_on_register:
@@ -921,7 +925,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		path = self._file_manager.join_path(FileDestinations.LOCAL, path, "current-print")
 		pathGcode = path + ".gcode"
 		path = path + (".gcode" if gcode else ".stl")
-		self._file_manager.add_file(FileDestinations.LOCAL, path, StreamWrapper(path, io.BytesIO(req_stl.content)), allow_overwrite=True)
+		self._file_manager.add_file(FileDestinations.LOCAL, path, StreamWrapper(path, BytesIO(req_stl.content)), allow_overwrite=True)
 		job_id = data['jobId'] if 'jobId' in data else "123"
 		self._logger.debug("print jobId is {}".format(job_id))
 		self._logger.debug("print data is {}".format(repr(data)))
@@ -1243,7 +1247,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ Slicing profile
 	def _create_slicing_profile(self, slicer, config_file_bytes):
 
-		class ConfigFileReader(BytesIO, object):
+		class ConfigFileReader(StringIO, object):
 			def __init__(self, *args, **kwargs):
 				self._dummy_section = True
 				self._indent = False
@@ -1260,26 +1264,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					self._indent = not self._indent
 				return line
 
-
-		def config_file_generator(fp):
-			# prepend a dummy section header (x)
-			# indent multi-line strings (in triple quotes)
-			indent = False
-			line = "[x]"
-			while line:
-				if indent:
-					line = "    " + line
-				if '"""' in line:
-					indent = not not indent
-				yield line
-				line = fp.readline()
-
 		# create an in memory "file" of the profile and prepend a dummy section
 		# header so ConfigParser won't give up so easily
-		config_file = ConfigFileReader(config_file_bytes)
+		config_file = ConfigFileReader(config_file_bytes.decode('utf-8'))
 
-		import ConfigParser
-		config = ConfigParser.ConfigParser()
+		try:
+			import configparser
+		except ImportError:
+			import ConfigParser as configparser
+		config = configparser.ConfigParser()
 		try:
 			config.readfp(config_file)
 		except:
