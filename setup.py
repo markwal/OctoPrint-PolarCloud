@@ -65,7 +65,7 @@ try:
 		plat = distutils.util.get_platform().replace('.', '_').replace('-', '_')
 		if plat in ['linux_armv7l', 'linux_armv6l'] and not hasattr(sys, 'pypy_version_info'):
 			plugin_requires = [
-				"cryptography @ https://markwal.github.io/wheelhouse/cryptography-2.5-cp27-none-" + plat + ".whl",
+				"cryptography @ https://markwal.github.io/wheelhouse/cryptography-3.0-cp27-none-" + plat + ".whl",
 				"cffi @ https://markwal.github.io/wheelhouse/cffi-1.12.1-cp27-none-" + plat + ".whl",
 				"Pillow @ https://markwal.github.io/wheelhouse/Pillow-5.4.1-cp27-none-" + plat + ".whl",
 			] + plugin_requires
