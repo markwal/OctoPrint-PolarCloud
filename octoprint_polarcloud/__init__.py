@@ -44,7 +44,7 @@ from OpenSSL import crypto
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
 import sarge
 import flask
-from flask.ext.babel import gettext, _
+from flask_babel import gettext, _
 import requests
 from PIL import Image
 
