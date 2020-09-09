@@ -29,13 +29,20 @@ import stat
 import threading
 import logging
 import uuid
-import Queue
+from functools import reduce
+try:
+	import queue
+except ImportError:
+	import Queue as queue
 import base64
 import datetime
 from time import sleep
-from StringIO import StringIO
 import io
-from urlparse import urlparse, urlunparse
+from io import StringIO, BytesIO
+try:
+	from urllib.parse import urlparse, urlunparse
+except ImportError:
+	from urlparse import urlparse, urlunparse
 import random
 import re
 import json
@@ -55,6 +62,7 @@ from octoprint.util import get_exception_string
 from octoprint.events import Events
 from octoprint.filemanager import FileDestinations
 from octoprint.filemanager.util import StreamWrapper
+from octoprint.slicing.exceptions import UnknownSlicer, SlicerNotConfigured
 
 # logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
 # logging.basicConfig()
@@ -131,7 +139,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._connected = False
 		self._status_now = False
 		self._challenge = None
-		self._task_queue = Queue.Queue()
+		self._task_queue = queue.Queue()
 		self._polar_status_worker = None
 		self._upload_location = {}
 		self._update_interval = 60
@@ -467,7 +475,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						try:
 							task = self._task_queue.get_nowait()
 							task()
-						except Queue.Empty:
+						except queue.Empty:
 							pass
 					if not ignore_status_now and self._status_now:
 						self._status_now = False
@@ -477,14 +485,17 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					if not self._connected:
 						self._socket = None
 						return False
+					if self._shutdown:
+						return False
 				return True
 			except:
-				if not self._connected:
-					# likely throw from disconnect
-					self._socket = None
-				else:
-					self._logger.exception("polar_heartbeat exception")
-					sleep(5)
+				if not self._shutdown:
+					if not self._connected:
+						# likely throw from disconnect
+						self._socket = None
+					else:
+						self._logger.exception("polar_heartbeat exception")
+						sleep(5)
 				return False
 
 		try:
@@ -493,8 +504,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			next_check_versions = datetime.datetime.now()
 			status_sent = 0
 			self._create_socket()
+			self._shutdown = False
 
-			while True:
+			while not self._shutdown:
 				self._logger.debug("self._socket: {}".format(repr(self._socket)))
 				if self._socket:
 					self._logger.debug("_wait_and_process")
@@ -547,6 +559,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						else:
 							skip_snapshot = False
 						self._upload_snapshot()
+					if self._shutdown:
+						return
 
 				self._logger.info("Socket disconnected, clear and restart")
 				if status_sent < 3 and not self._disconnect_on_register:
@@ -601,7 +615,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			image_size = len(image_bytes)
 			if self._image_transpose or image_size > self._max_image_size:
 				self._logger.debug("Recompressing snapshot to smaller size")
-				buf = StringIO()
+				buf = BytesIO()
 				buf.write(image_bytes)
 				image = Image.open(buf)
 				image.thumbnail((640, 480))
@@ -611,7 +625,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					image = image.transpose(Image.FLIP_TOP_BOTTOM)
 				if self._settings.global_get(["webcam", "rotate90"]):
 					image = image.transpose(Image.ROTATE_90)
-				image_bytes = StringIO()
+				image_bytes = BytesIO()
 				image.save(image_bytes, format="jpeg")
 				image_bytes.seek(0, 2)
 				new_image_size = image_bytes.tell()
@@ -689,7 +703,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._logger.debug('_on_welcome: {}'.format(repr(welcome)))
 		if 'challenge' in welcome:
 			self._challenge = welcome['challenge']
-			if isinstance(self._challenge, unicode):
+			if not isinstance(self._challenge, bytes):
 				self._challenge = self._challenge.encode('utf-8')
 			self._task_queue.put(self._hello)
 
@@ -716,7 +730,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				transformImg += 4
 			self._socket.emit('hello', {
 				'serialNumber': self._serial,
-				'signature': base64.b64encode(crypto.sign(self._key, self._challenge, b'sha256')),
+				'signature': base64.b64encode(crypto.sign(self._key, self._challenge, 'sha256')).decode('utf-8'),
 				'MAC': get_mac(),
 				'localIP': get_ip(),
 				'protocol': '2',
@@ -888,8 +902,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._logger.exception("Could not retrieve slicer config file from PolarCloud: {}".format(data['configFile']))
 				return
 			slicer = self._get_slicer_name()
-			(slicing_profile, pos) = self._create_slicing_profile(slicer, req_ini.content)
-			if not slicing_profile:
+			slicing_profile = None
+			try:
+				(slicing_profile, pos) = self._create_slicing_profile(slicer, req_ini.content)
+			except (UnknownSlicer, SlicerNotConfigured):
+				#TODO tell PolarCloud that we don't have a slicer so it can tell the user
+				pass
+			if slicing_profile is None:
 				self._logger.warn("Unable to create slicing profile. Aborting slice and print.")
 				return
 
@@ -906,7 +925,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		path = self._file_manager.join_path(FileDestinations.LOCAL, path, "current-print")
 		pathGcode = path + ".gcode"
 		path = path + (".gcode" if gcode else ".stl")
-		self._file_manager.add_file(FileDestinations.LOCAL, path, StreamWrapper(path, io.BytesIO(req_stl.content)), allow_overwrite=True)
+		self._file_manager.add_file(FileDestinations.LOCAL, path, StreamWrapper(path, BytesIO(req_stl.content)), allow_overwrite=True)
 		job_id = data['jobId'] if 'jobId' in data else "123"
 		self._logger.debug("print jobId is {}".format(job_id))
 		self._logger.debug("print data is {}".format(repr(data)))
@@ -1182,6 +1201,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			else:
 				self._pstate = self.PSTATE_COMPLETE
 				self._pstate_counter = 3
+		elif event == Events.SHUTDOWN:
+			self._shutdown = True
+			return
 		elif hasattr(Events, 'PRINTER_STATE_CHANGED') and event == Events.PRINTER_STATE_CHANGED:
 			self._status_now = True
 			return
@@ -1242,26 +1264,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					self._indent = not self._indent
 				return line
 
-
-		def config_file_generator(fp):
-			# prepend a dummy section header (x)
-			# indent multi-line strings (in triple quotes)
-			indent = False
-			line = "[x]"
-			while line:
-				if indent:
-					line = "    " + line
-				if '"""' in line:
-					indent = not not indent
-				yield line
-				line = fp.readline()
-
 		# create an in memory "file" of the profile and prepend a dummy section
 		# header so ConfigParser won't give up so easily
-		config_file = ConfigFileReader(config_file_bytes)
+		config_file = ConfigFileReader(config_file_bytes.decode('utf-8'))
 
-		import ConfigParser
-		config = ConfigParser.ConfigParser()
+		try:
+			import configparser
+		except ImportError:
+			import ConfigParser as configparser
+		config = configparser.ConfigParser()
 		try:
 			config.readfp(config_file)
 		except:
@@ -1484,6 +1495,7 @@ class PolarPrintPreparer(object):
 			self._callback_failed()
 
 __plugin_name__ = "PolarCloud"
+__plugin_pythoncompat__ = ">=2.7,<4"
 
 def __plugin_load__():
 	global __plugin_implementation__

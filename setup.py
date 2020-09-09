@@ -63,7 +63,7 @@ try:
 		print("May not be able to successfully install with setuptools earlier than 40.0.0. If this fails, upgrade setup tools with 'pip install --upgrade setuptools'.")
 	else:
 		plat = distutils.util.get_platform().replace('.', '_').replace('-', '_')
-		if plat in ['linux_armv7l', 'linux_armv6l'] and not hasattr(sys, 'pypy_version_info'):
+		if sys.version_info[0:2] == (2, 7) and plat in ['linux_armv7l', 'linux_armv6l'] and not hasattr(sys, 'pypy_version_info'):
 			plugin_requires = [
 				"cryptography @ https://markwal.github.io/wheelhouse/cryptography-3.0-cp27-none-" + plat + ".whl",
 				"cffi @ https://markwal.github.io/wheelhouse/cffi-1.12.1-cp27-none-" + plat + ".whl",
