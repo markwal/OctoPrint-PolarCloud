@@ -27,7 +27,7 @@ following command line:
 
 ```
 sudo apt-get update
-sudo apt install gstreamer1.0-tools libx264-dev gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
+sudo apt install gstreamer1.0-tools gstreamer1.0-libav libx264-dev gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
 ```
 
 ## Plugin Configuration
