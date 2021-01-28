@@ -302,26 +302,36 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.exception("Failed to run system command: {}".format(command_line))
 			return (1, "")
 
-
-	def _get_keys(self):
-		data_folder = self.get_plugin_data_folder()
-		key_filename = os.path.join(data_folder, 'p3d_key')
-		self._logger.debug('key_filename: {}'.format(key_filename))
-		if not os.path.isfile(key_filename):
-			self._logger.debug('Generating key pair')
+	def _generate_key(self, key_filename):
+		try:
+			self._logger.info('Generating key pair')
 			key = crypto.PKey()
 			key.generate_key(crypto.TYPE_RSA, 2048)
-			with open(key_filename, 'w') as f:
+			with open(key_filename, 'wb') as f:
 				f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
 			if sys.platform != 'win32':
 				os.chmod(key_filename, stat.S_IRUSR | stat.S_IWUSR)
+		except:
+			self._logger.exception("Unable to generate and save new private key")
+
+	def _get_keys(self, force_regen = False):
+		data_folder = self.get_plugin_data_folder()
+		key_filename = os.path.join(data_folder, 'p3d_key')
+		self._logger.debug('key_filename: {}'.format(key_filename))
+		if force_regen or not os.path.isfile(key_filename):
+			self._generate_key(key_filename)
 		try:
 			with open(key_filename) as f:
 				key = f.read()
+			if force_regen and len(key) <= 0:
+				self._logger.warn("Found zero length key, generating a new key")
+				self._generate_key(key_filename)
+				with open(key_filename) as f:
+					key = f.read()
 			self._key = crypto.load_privatekey(crypto.FILETYPE_PEM, key)
 		except:
 			self._key = None
-			self._logger.error("Unable to generate or access key.")
+			self._logger.exception("Unable to generate or access key.")
 			return
 
 		if hasattr(self._key, 'dump_publickey'):
@@ -795,6 +805,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _register(self, email, pin):
 		self._get_keys()
+		if not self._key:
+			self._get_keys(True)
 		if not self._key:
 			self._logger.info("Can't register because unable to generate signing key")
 			self._plugin_manager.send_plugin_message(self._identifier, {

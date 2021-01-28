@@ -4,7 +4,7 @@
 plugin_identifier = "polarcloud"
 plugin_package = "octoprint_polarcloud"
 plugin_name = "OctoPrint-PolarCloud"
-plugin_version = "1.12"
+plugin_version = "1.13"
 plugin_description = """Connects OctoPrint to the PolarCloud so you can easily monitor and control outside of your local network"""
 plugin_author = "Mark Walker"
 plugin_author_email = "markwal@hotmail.com"
@@ -61,15 +61,6 @@ try:
 
 	if int(setuptools.__version__.split('.')[0]) < 40:
 		print("May not be able to successfully install with setuptools earlier than 40.0.0. If this fails, upgrade setup tools with 'pip install --upgrade setuptools'.")
-	else:
-		plat = distutils.util.get_platform().replace('.', '_').replace('-', '_')
-		if sys.version_info[0:2] == (2, 7) and plat in ['linux_armv7l', 'linux_armv6l'] and not hasattr(sys, 'pypy_version_info'):
-			plugin_requires = [
-				"cryptography @ https://markwal.github.io/wheelhouse/cryptography-3.0-cp27-none-" + plat + ".whl",
-				"cffi @ https://markwal.github.io/wheelhouse/cffi-1.12.1-cp27-none-" + plat + ".whl",
-				"Pillow @ https://markwal.github.io/wheelhouse/Pillow-5.4.1-cp27-none-" + plat + ".whl",
-			] + plugin_requires
-			add_pillow = False
 except:
 	import traceback
 	traceback.print_exc()
