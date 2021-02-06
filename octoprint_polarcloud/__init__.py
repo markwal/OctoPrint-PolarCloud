@@ -311,7 +311,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.debug('Generating key pair')
 			key = crypto.PKey()
 			key.generate_key(crypto.TYPE_RSA, 2048)
-			with open(key_filename, 'w') as f:
+			with open(key_filename, 'w' if sys.version_info < (3, 0) else 'wb') as f:
 				f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
 			if sys.platform != 'win32':
 				os.chmod(key_filename, stat.S_IRUSR | stat.S_IWUSR)
