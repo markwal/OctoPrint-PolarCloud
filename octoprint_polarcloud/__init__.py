@@ -153,6 +153,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._image_transpose = False
 		self._printer_type = None
 		self._disconnect_on_register = False
+		self._disconnect_on_unregister = False
 		self._hello_sent = False
 		self._port = 80
 		self._octoprint_client = None
@@ -160,7 +161,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._next_pending = False
 		self._print_preparer = None
 		self._status = None
-
+		self._email = None
+		self._pin = None
 		# consider temp reads higher than this as having a target set for more
 		# frequent reports
 		self._set_temp_threshold = 50
@@ -172,8 +174,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			service="https://printer2.polar3d.com",
 			service_ui="https://pc2-dev.polar3d.com",
 			serial=None,
+			machine_type="Rectangular (Cartesian)",
 			printer_type="Cartesian",
 			email="",
+			pin="",
 			max_image_size = 150000,
 			verbose=False,
 			upload_timelapse=True,
@@ -282,6 +286,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('connectPrinter', self._on_connect_printer)
 		self._socket.on('customCommand', self._on_custom_command)
 		self._socket.on('jogPrinter', self._on_jog_printer)
+		self._socket.on('unregisterResponse', self._on_unregister_response)
 
 	def _start_polar_status(self):
 		if self._polar_status_worker:
@@ -293,6 +298,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._polar_status_worker = threading.Thread(target=self._polar_status_heartbeat)
 			self._polar_status_worker.daemon = True
 			self._polar_status_worker.start()
+
+	def _stop_polar_status(self):
+		if self._polar_status_worker:
+			self._shutdown = True
 
 	def _system(self, command_line):
 		try:
@@ -563,7 +572,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						return
 
 				self._logger.info("Socket disconnected, clear and restart")
-				if status_sent < 3 and not self._disconnect_on_register:
+				if status_sent < 3 and not self._disconnect_on_register and not self._disconnect_on_unregister:
 					self._logger.warn("Unable to connect to Polar Cloud")
 					break
 				self._socket = None
@@ -576,6 +585,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _on_disconnect(self):
 		self._logger.debug("[Disconnected]")
 		self._connected = False
+		# If unregisterd shutdown worker
+		if self._disconnect_on_unregister:
+			self._stop_polar_status()
+			self._disconnect_on_unregister = False
 
 	#~~ time-lapse and snapshots to cloud
 
@@ -713,6 +726,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._hello_sent = True
 			self._status_now = True
 			self._logger.debug('emit hello')
+			self._machine_type = self._settings.get(["machine_type"])
 			self._printer_type = self._settings.get(["printer_type"])
 			camUrl = self._settings.global_get(["webcam", "stream"])
 			try:
@@ -736,6 +750,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'protocol': '2',
 				'camUrl': camUrl,
 				'transformImg': transformImg,
+				'machineType': self._machine_type,
 				'printerType': self._printer_type
 			})
 			self._challenge = None
@@ -768,10 +783,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if 'serialNumber' in response:
 			self._serial = response['serialNumber']
 			self._settings.set(['serial'], self._serial)
+			self._settings.set(['email'], self._email)
+			self._settings.set(['pin'], self._pin)
+			self._settings.save()
 			self._status_now = True
 			self._plugin_manager.send_plugin_message(self._identifier, {
-				'command': 'serial',
-				'serial': self._serial
+				'command': 'registration_success',
+				'serial': self._serial,
+				'email': self._email,
+				'pin': self._pin,
 			})
 			self._disconnect_on_register = True
 			self._socket.disconnect()
@@ -805,7 +825,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		if not self._socket:
 			self._start_polar_status()
-			sleep(2) # give the thread a moment to start communicating
+			sleep(8) # give the thread a moment to start communicating
 			self._logger.debug("Do we have a socket: {}".format(repr(self._socket)))
 		if not self._socket:
 			self._logger.info("Can't register because unable to communicate with Polar Cloud")
@@ -819,8 +839,47 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"publicKey": self._public_key,
 			"myInfo": {
 				"MAC": get_mac(),
-				"protocolVersion": "2"
+				"protocolVersion": "2",
+				"machineType": self._settings.get(["machine_type"]),
+				"printerType": self._settings.get(["printer_type"]),
 			}
+		})
+		return True
+
+	#~~ unregister -> polar: unregisterReponse
+
+	def _on_unregister_response(self, response, *args, **kwargs):
+		self._logger.debug('on_unregister_response: {}'.format(repr(response)))
+		if response['status'] == 'SUCCESS':
+			self._settings.set(['serial'], '')
+			self._settings.set(['email'], '')
+			self._settings.set(['pin'], '')
+			self._settings.save()
+			self._status_now = True
+			self._serial = None
+			self._plugin_manager.send_plugin_message(self._identifier, {
+				'command': 'unregistration_success',
+			})
+			self._disconnect_on_unregister = True
+			self._socket.disconnect()
+		else:
+			self._plugin_manager.send_plugin_message(self._identifier, {
+				'command': 'unregistration_failed',
+				'reason': response['message']
+			})
+
+	def _unregister(self):
+		if not self._socket:
+			self._start_polar_status()
+			sleep(8) # give the thread a moment to start communicating
+			self._logger.debug("Do we have a socket: {}".format(repr(self._socket)))
+		if not self._socket:
+			self._logger.info("Can't unregister because unable to communicate with Polar Cloud")
+			return False
+
+		self._logger.info("emit unregister")
+		self._socket.emit("unregister", {
+			"serialNumber": self._serial,
 		})
 		return True
 
@@ -1219,7 +1278,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def get_api_commands(self, *args, **kwargs):
 		return dict(
-			register=[]
+			register=[],
+			unregister=[],
 		)
 
 	def is_api_adminonly(self, *args, **kwargs):
@@ -1229,10 +1289,22 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		status='FAIL'
 		message=''
 		if command == 'register' and 'email' in data and 'pin' in data:
+			if 'machine_type' in data:
+				self._settings.set(['machine_type'], data['machine_type'])
 			if 'printer_type' in data:
 				self._printer_type = data['printer_type']
 				self._settings.set(['printer_type'], self._printer_type)
+			if 'email' in data:
+				self._email =  data['email']
+			if 'pin' in data:
+				self._pin =  data['pin']
 			if self._register(data['email'], data['pin']):
+				status = 'WAIT'
+				message = "Waiting for response from Polar Cloud"
+			else:
+				message = "Unable to communicate with Polar Cloud"
+		elif command == 'unregister':
+			if self._unregister():
 				status = 'WAIT'
 				message = "Waiting for response from Polar Cloud"
 			else:

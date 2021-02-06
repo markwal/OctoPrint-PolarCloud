@@ -30,6 +30,10 @@ $(function() {
         self.registering = ko.observable(false);
         self.registrationFailed = ko.observable(false);
         self.registrationFailedReason = ko.observable("");
+        self.unregistering = ko.observable(false);
+        self.unregistrationFailed = ko.observable(false);
+        self.unregistrationFailedReason = ko.observable("");
+        self.machineTypes = ko.observableArray();
         self.printerTypes = ko.observableArray();
         self.nextPrintAvailable = ko.observable(false);
 
@@ -40,11 +44,12 @@ $(function() {
 
         self.onBeforeBinding = function() {
             self.settings = self.settingsViewModel.settings.plugins.polarcloud;
+            self.machineTypes(["Rectangular (Cartesian)", "Circular (Delta)"]);
             self._ensureCurrentPrinterType();
         };
 
         self.onSettingsShown = function() {
-            $.ajax(self.settings.service_ui() + "/api/v1/printer_makes", { headers: "" })
+            $.ajax(self.settings.service_ui() + "/api/v1/printer_makes?filter=octoprint", { headers: "" })
                 .done(function(response) {
                     if ("printerMakes" in response) {
                         self.printerTypes(response["printerMakes"]);
@@ -60,15 +65,17 @@ $(function() {
                 });
         };
 
-        self.showRegistration = function() {
-            self.emailAddress(self.settings.email());
-            $("#plugin_polarcloud_registration").modal("show");
+        self.changeRegistrationStatus = function() {
+            if(self.settings.serial()){
+                $("#plugin_polarcloud_unregistration").modal("show");
+            } else {
+                $("#plugin_polarcloud_registration").modal("show");
+            }
         };
 
         self.registerPrinter = function() {
             if (self.registering())
                 return;
-            self.settings.email(self.emailAddress())
             self.registering(true);
             self.registrationFailed(false);
             setTimeout(function() {
@@ -81,11 +88,31 @@ $(function() {
             OctoPrint.simpleApiCommand("polarcloud", "register", {
                 "email": self.emailAddress(),
                 "pin": self.pin(),
-                "printer_type": self.settings.printer_type()
+                "printer_type": self.settings.printer_type(),
+                "machine_type": self.settings.machine_type()
             }).done(function(response) {
                 console.log("polarcloud register response" + JSON.stringify(response));
             });
         };
+
+        self.unregisterPrinter = function() {
+            if (self.unregistering())
+                return;
+            self.unregistering(true);
+            self.unregistrationFailed(false);
+            setTimeout(function() {
+                if (self.unregistering()) {
+                    self.unregistering(false);
+                    self.unregistrationFailed(true);
+                    self.unregistrationFailedReason("Couldn't connect to the Polar Cloud.");
+                }
+            }, 10000);
+            OctoPrint.simpleApiCommand("polarcloud", "unregister", {
+                "serialNumber": "test",
+            }).done(function(response) {
+                console.log("polarcloud unregister response" + JSON.stringify(response));
+            });
+        }
 
         self.onDataUpdaterPluginMessage = function(plugin, data) {
             if (plugin != "polarcloud")
@@ -98,11 +125,29 @@ $(function() {
                 return;
             }
 
-            if (data.command == "serial" && data.serial) {
+            if (data.command == "registration_success") {
                 self.settings.serial(data.serial);
+                self.settings.email(data.email);
+                self.settings.pin(data.pin);
+                self.registering(false);
+                $("#plugin_polarcloud_registration").modal("hide");
+                return
             }
-            self.registering(false);
-            $("#plugin_polarcloud_registration").modal("hide");
+
+            if (data.command == "unregistration_failed") {
+                self.unregistering(false);
+                self.unregistrationFailed(true);
+                self.unregistrationFailedReason(data.reason);
+                return;
+            }
+
+            if (data.command == "unregistration_success") {
+                self.unregistering(false);
+                self.settings.serial('');
+                self.settings.email('');
+                self.settings.pin('');
+                $("#plugin_polarcloud_unregistration").modal("hide");
+            }
         };
     }
 

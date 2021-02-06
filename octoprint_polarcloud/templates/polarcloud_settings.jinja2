@@ -1,7 +1,7 @@
 <form id="settings_plugin_polarcloud" class="form-horizontal">
     <a class="row" data-bind="attr: { href: settings.service_ui }" target="_blank">
         <div id="polarcloud-logo" data-toggle="tooltip" title="{{ _('The Polar Cloud logo is a trademark of Polar3D LLC') }}">
-        <div class="span6">
+        <div class="span6" style="margin-bottom: 20px;">
             <!--?xml version="1.0" encoding="UTF-8" standalone="no"?-->
             <svg viewBox="0 0 208 31" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
                 <!-- Generator: Sketch 39.1 (31720) - http://www.bohemiancoding.com/sketch -->
@@ -33,20 +33,41 @@
         </div></div>
     </a>
     <div class="control-group">
-        <label class="control-label">{{ _('Serial number') }}</label>
+        <label class="control-label">{{ _('Machine Type:') }}</label>
         <div class="controls">
-            <input type="text" class="input-block-level" data-bind="value: settings.serial" readonly>
+            <select data-bind="value: settings.machine_type, options: machineTypes"></select>
         </div>
     </div>
     <div class="control-group">
-        <label class="control-label">{{ _('Machine type:') }}</label>
+        <label class="control-label">{{ _('Brand/Make:') }}</label>
         <div class="controls">
             <select data-bind="value: settings.printer_type, options: printerTypes"></select>
+            <div data-bind="visible: settings.serial">
+                <small>** Any changes made requires a restart to take effect **</small>
+            </div>
+        </div>
+    </div>
+    <div class="control-group" data-bind="visible: settings.email">
+        <label class="control-label">{{ _('Cloud Username/Email:') }}</label>
+        <div class="controls">
+            <input type="text" class="input" data-bind="value: settings.email" readonly>
+        </div>
+    </div>
+    <div class="control-group" data-bind="visible: settings.pin">
+        <label class="control-label">{{ _('4 Digit PIN:') }}</label>
+        <div class="controls">
+            <input type="text" class="input" data-bind="value: settings.pin" readonly>
+        </div>
+    </div>
+    <div class="control-group" data-bind="visible: settings.serial">
+        <label class="control-label">{{ _('Serial number:') }}</label>
+        <div class="controls">
+            <input type="text" class="input" data-bind="value: settings.serial" readonly>
         </div>
     </div>
     <div class="control-group">
         <div class="controls">
-            <button class="btn" data-bind="click: showRegistration">{{ _('Register Printer') }}</button>
+            <button class="btn" data-bind="click: changeRegistrationStatus, text: settings.serial() ? '{{ _('Unregister Printer') }}' : '{{ _('Register Printer') }}'"></button>
         </div>
     </div>
     <div class="control-group">
@@ -106,6 +127,34 @@
             <button class="btn" data-dismiss="modal">{{ _('Cancel') }}</button>
             <button class="btn btn-primary" data-bind="click: registerPrinter">{{ _('Register') }}
                 <i class="icon-spinner icon-spin" data-bind="visible: registering" style="display: none;"></i>
+            </button>
+        </div>
+    </div>
+    <div id="plugin_polarcloud_unregistration" class="modal hide fade">
+        <div class="modal-header">
+            <a href="#" class="close" data-dismiss="modal" aria-hidden="true">&times;</a>
+            <h3>{{ _('Unregister OctoPrint with Polar Cloud') }}</h3>
+        </div>
+        <div class="modal-body">
+            <div>
+                <div class="alert alert-error" data-bind="visible: unregistrationFailed">
+                    {{ _('Failed to unregister OctoPrint with the Polar Cloud.') }}
+                    <span data-bind="html: unregistrationFailedReason"></span>
+                </div>
+            </div>
+            <div>
+                <p>
+                    {{ _('Are you sure you want to unregister this printer? This will mark your serial number as "Deleted" in the cloud and allow someone else to register this octoprint instance with their own username and PIN.') }}
+                </p>
+                <p>
+                    {{ _('Please not that if you try to register it again using your same credentials, you will be granted the same serial number you had before.') }}
+                </p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" data-dismiss="modal">{{ _('Cancel') }}</button>
+            <button class="btn btn-danger" data-bind="click: unregisterPrinter">{{ _('Unregister') }}
+                <i class="icon-spinner icon-spin" data-bind="visible: unregistering" style="display: none;"></i>
             </button>
         </div>
     </div>
