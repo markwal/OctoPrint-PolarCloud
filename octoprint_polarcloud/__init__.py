@@ -182,7 +182,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			verbose=False,
 			upload_timelapse=True,
 			enable_system_commands=True,
-			next_print=True
+			next_print=False
 		)
 
 	def _update_local_settings(self):
@@ -770,7 +770,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		})
 
 	def _send_next_print(self):
-		if self._capabilities and 'sendNextPrint' in self._capabilities and self._settings.get_boolean(['next_print']):
+		if self._settings.get_boolean(['next_print']):
 			self._logger.debug("emit sendNextPrint")
 			self._socket.emit('sendNextPrint', {
 				'serialNumber': self._serial
