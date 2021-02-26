@@ -35,13 +35,13 @@
     <div class="control-group">
         <label class="control-label">{{ _('Machine Type:') }}</label>
         <div class="controls">
-            <select data-bind="value: settings.machine_type, options: machineTypes"></select>
+            <select data-bind="value: machineType, options: machineTypes, event: {change: onChangeMachineType}"></select>
         </div>
     </div>
     <div class="control-group">
-        <label class="control-label">{{ _('Brand/Make:') }}</label>
+        <label class="control-label">{{ _('Printer Make:') }}</label>
         <div class="controls">
-            <select data-bind="value: settings.printer_type, options: printerTypes"></select>
+            <select data-bind="value: printerType, options: printerTypes, optionsValue: printerTypeOptionsValue, optionsText: printerTypeOptionsText, disable: isPrinterTypesLoading"></select>
             <div data-bind="visible: settings.serial">
                 <small>** Any changes made requires a restart to take effect **</small>
             </div>

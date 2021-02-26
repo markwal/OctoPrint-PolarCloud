@@ -35,27 +35,68 @@ $(function() {
         self.unregistrationFailedReason = ko.observable("");
         self.machineTypes = ko.observableArray();
         self.printerTypes = ko.observableArray();
+        self.isPrinterTypesLoading = ko.observable(false);
+        self.machineType = ko.observable("");
+        self.printerType = ko.observable("");
 
-        self._ensureCurrentPrinterType = function() {
-            if (self.printerTypes().indexOf(self.settings.printer_type()) < 0)
-                self.printerTypes.push(self.settings.printer_type());
-        };
+        self.machineType.subscribe(function (value) {
+            if (value) {
+                self.settings.machine_type(value);
+            }
+        });
+
+        self.printerType.subscribe(function (value) {
+            if (value) {
+                self.settings.printer_type(value);
+            }
+        });
 
         self.onBeforeBinding = function() {
             self.settings = self.settingsViewModel.settings.plugins.polarcloud;
-            self.machineTypes(["Rectangular (Cartesian)", "Circular (Delta)"]);
-            self._ensureCurrentPrinterType();
         };
 
-        self.onSettingsShown = function() {
-            $.ajax(self.settings.service_ui() + "/api/v1/printer_makes?filter=octoprint", { headers: "" })
+        self.printerTypeOptionsValue = function(item) {
+            return item == "Other/Custom" ? self.settings.machine_type() : item;
+        }
+
+        self.printerTypeOptionsText = function(item) {
+            return item;
+        }
+
+        self.loadPrinterTypes = function(machine_type, printer_type) {
+            self.isPrinterTypesLoading(true);
+            $.ajax(self.settings.service_ui() + "/api/v1/printer_makes?filter=" + machine_type.toLocaleLowerCase(), { headers: "" })
                 .done(function(response) {
                     if ("printerMakes" in response) {
-                        self.printerTypes(response["printerMakes"]);
-                        self._ensureCurrentPrinterType();
+                        self.isPrinterTypesLoading(false);
+                        var options = response["printerMakes"];
+                        options.push("Other/Custom");
+                        self.printerTypes(options);
+                        if (printer_type) {
+                            self.printerType(printer_type);
+                        }
+                    }
+                });
+        }
+
+        self.onSettingsShown = function() {
+            var initialMachineType = self.settings.machine_type();
+            var initialPrinterType = self.settings.printer_type();
+            $.ajax(self.settings.service_ui() + "/api/v1/printer_makes?filter=octoprint-build", { headers: "" })
+                .done(function(response) {
+                    if ("printerMakes" in response) {
+                        self.machineTypes(response["printerMakes"]);
+                        self.machineType(initialMachineType);
+                        self.loadPrinterTypes(initialMachineType, initialPrinterType);
                     }
                 });
         };
+
+        self.onChangeMachineType = function(obj, event) {
+            if (event.originalEvent) {
+                self.loadPrinterTypes(self.machineType(), null);
+            }
+        }
 
         self.changeRegistrationStatus = function() {
             if(self.settings.serial()){
