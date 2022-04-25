@@ -172,7 +172,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def get_settings_defaults(self, *args, **kwargs):
 		return dict(
 			service="https://printer2.polar3d.com",
-			service_ui="https://pc2-dev.polar3d.com",
+			service_ui="https://polar3d.com",
 			serial=None,
 			machine_type="Cartesian",
 			printer_type="Cartesian",
