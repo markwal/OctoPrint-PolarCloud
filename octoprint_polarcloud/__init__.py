@@ -48,8 +48,9 @@ import re
 import json
 
 from OpenSSL import crypto
-from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
+import socketio
 import sarge
+import time
 import flask
 from flask_babel import gettext, _
 import requests
@@ -76,7 +77,7 @@ def get_ip():
 	return octoprint.util.address_for_client("google.com", 80)
 
 # take a server relative or localhost url and attempt to make absolute an absolute
-# url out of it  (guess about which interface)
+# url out of it python-socketio(guess about which interface)
 def normalize_url(url):
 	urlp = urlparse(url)
 	scheme = urlp.scheme
@@ -171,7 +172,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def get_settings_defaults(self, *args, **kwargs):
 		return dict(
-			service="https://printer2.polar3d.com",
+			service="https://printer4.polar3d.com",
 			service_ui="https://polar3d.com",
 			serial=None,
 			machine_type="Cartesian",
@@ -264,8 +265,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._challenge = None
 			self._connected = True
 			self._hello_sent = False
-			self._socket = SocketIO(self._settings.get(['service']), Namespace=LoggingNamespace, verify=True, wait_for_connection=False)
-		except (TimeoutError, ConnectionError, StopIteration):
+			self._socket = socketio.Client()
+		except:
 			self._socket = None
 			self._logger.exception('Unable to open socket {}'.format(get_exception_string()))
 			return
@@ -500,7 +501,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						self._status_now = False
 						self._logger.debug("_status_now break")
 						return False
-					self._socket.wait(seconds=1)
+					time.sleep(1)
 					if not self._connected:
 						self._socket = None
 						return False
