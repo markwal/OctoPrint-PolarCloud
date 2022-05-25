@@ -288,6 +288,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('customCommand', self._on_custom_command)
 		self._socket.on('jogPrinter', self._on_jog_printer)
 		self._socket.on('unregisterResponse', self._on_unregister_response)
+		self._socket.connect(self._settings.get(['service']))
 
 	def _start_polar_status(self):
 		if self._polar_status_worker:
