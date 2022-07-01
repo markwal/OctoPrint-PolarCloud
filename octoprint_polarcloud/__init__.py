@@ -166,6 +166,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		# consider temp reads higher than this as having a target set for more
 		# frequent reports
 		self._set_temp_threshold = 50
+		self._sent_command_list = None
 
 	##~~ SettingsPlugin mixin
 
@@ -1111,11 +1112,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			except Exception:
 				self._logger.exception("Could not retrieve system commands")
 
-		self._logger.debug("customCommandList")
-		self._socket.emit('customCommandList', {
-			'serialNumber': self._serial,
-			'commandList': command_list
-		})
+		if self._sent_command_list != command_list:
+			self._logger.debug("customCommandList")
+			self._socket.emit('customCommandList', {
+				'serialNumber': self._serial,
+				'commandList': command_list
+			})
+			self._sent_command_list = command_list
+			self._logger.debug("customCommandList sent.");
+		else:
+			self._logger.warn("customCommandList generated, but dropped because no changes detected.");
 
 	def _on_custom_command(self, data, *args, **kwargs):
 		self._logger.debug("customCommand: {}".format(repr(data)))
