@@ -10,7 +10,7 @@ plugin_author = "Mark Walker"
 plugin_author_email = "markwal@hotmail.com"
 plugin_url = "https://github.com/markwal/OctoPrint-PolarCloud"
 plugin_license = "AGPLv3"
-plugin_requires = ["SocketIO-client", "cryptography==37.0.4", "pyopenssl==22.0.0"]
+plugin_requires = ["SocketIO-client", "pycryptodomex"]
 
 ### --------------------------------------------------------------------------------------------------------------------
 ### More advanced options that you usually shouldn't have to touch follow after this point

@@ -47,7 +47,10 @@ import random
 import re
 import json
 
-from OpenSSL import crypto
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Signature import pkcs1_15
+from Cryptodome.Hash import SHA256
+
 from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
 import sarge
 import flask
@@ -315,10 +318,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _generate_key(self, key_filename):
 		try:
 			self._logger.info('Generating key pair')
-			key = crypto.PKey()
-			key.generate_key(crypto.TYPE_RSA, 2048)
+			key = RSA.generate(2048)
 			with open(key_filename, 'wb') as f:
-				f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
+				f.write(key.export_key('PEM'))
 			if sys.platform != 'win32':
 				os.chmod(key_filename, stat.S_IRUSR | stat.S_IWUSR)
 		except:
@@ -338,19 +340,21 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._generate_key(key_filename)
 				with open(key_filename) as f:
 					key = f.read()
-			self._key = crypto.load_privatekey(crypto.FILETYPE_PEM, key)
+			self._key = RSA.import_key(key)
 		except:
 			self._key = None
 			self._logger.exception("Unable to generate or access key.")
 			return
 
-		if hasattr(self._key, 'dump_publickey'):
-			self._public_key = crypto.dump_publickey(crypto.FILETYPE_PEM, self._key)
-		else:
+		try:
+			self._public_key = self._key.public_key().export_key().decode('utf-8')
+		except:
+			self._logger.info("Unable to get public key via export_key, reading .pub file")
 			pubkey_filename = key_filename + ".pub"
 			if not os.path.isfile(pubkey_filename) or os.path.getsize(pubkey_filename) == 0:
 				if sys.platform != 'win32':
 					os.chmod(key_filename, stat.S_IRUSR | stat.S_IWUSR)
+				self._logger.info("Unable to read .pub file, attempting ssh-keygen")
 				command_line = "ssh-keygen -e -m PEM -f {key_filename} > {pubkey_filename}".format(key_filename=key_filename, pubkey_filename=pubkey_filename)
 				returncode, stderr_text = self._system(command_line)
 				if returncode != 0:
@@ -755,7 +759,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				transformImg += 4
 			self._socket.emit('hello', {
 				'serialNumber': self._serial,
-				'signature': base64.b64encode(crypto.sign(self._key, self._challenge, 'sha256')).decode('utf-8'),
+				'signature': base64.b64encode(pkcs1_15.new(self._key).sign(SHA256.new(self._challenge))).decode('utf-8'),
 				'MAC': get_mac(),
 				'localIP': get_ip(),
 				'protocol': '2',
