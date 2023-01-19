@@ -1379,9 +1379,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		layer_height = 0.2
 		if "layerThickness" in config.options("x"):
 			layer_height = config.get("x", "layerThickness")
+		elif "layer_height" in config.options("x"):
+			layer_height = config.get("x", "layer_height")
 		init_layer_height = layer_height
 		if "initialLayerThickness" in config.options("x"):
 			init_layer_height = config.get("x", "initialLayerThickness")
+		elif "first_layer_height" in config.options("x"):
+			init_layer_height = config.get("x", "first_layer_height")
 
 		posx = 0
 		posy = 0
@@ -1493,6 +1497,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 #]
 		profile_from_engine_config = {
 			"layerthickness":       ("layer_height",       mm_from_um),
+			"layer_height":         ("layer_height",       no_translation),
 			"printspeed":           ("print_speed",        no_translation),
 			"supporttype":          ("support_type",       lambda x: "lines" if x == 0 else "grid"),
 			"infillspeed":          ("infill_speed",       no_translation),
@@ -1503,6 +1508,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"retractionamount":     ("retraction_amount",  mm_from_um),
 			"retractionspeed":      ("retraction_speed",   no_translation),
 			"initiallayerthickness":("bottom_thickness",   mm_from_um),
+			"first_layer_height":   ("init_layer_height",  no_translation),
 			"extrusionwidth":       ("edge_width",         mm_from_um),
 			"insetcount":           ("wall_thickness",     width_from_line_count),
 			"downskincount":        ("solid_layer_thickness", height_from_layer_count),
