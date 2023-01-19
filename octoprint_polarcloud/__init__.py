@@ -1356,13 +1356,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		# create an in memory "file" of the profile and prepend a dummy section
 		# header so ConfigParser won't give up so easily
+		# DEBUG
+		with open("/home/pi/foo.ini", "w") as ini_file:
+			ini_file.write(config_file_bytes.decode('utf-8'))
 		config_file = ConfigFileReader(config_file_bytes.decode('utf-8'))
 
 		try:
 			import configparser
 		except ImportError:
 			import ConfigParser as configparser
-		config = configparser.ConfigParser()
+		config = configparser.ConfigParser(interpolation=None)
 		try:
 			config.readfp(config_file)
 		except:
@@ -1387,7 +1390,109 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		width_from_line_count = lambda x: x * extrusion_width
 		height_from_layer_count = lambda x: x * layer_height
 		bool_from_int = lambda x: not not x
+"""
+FUTURE WIP: mappings used by PolarCloud in the switch to the Prusa slicer
+delete them as we cover them
+const curaToPrusaMapping = {
+  infillAmount:              "fill_density",
+  infillOverlap:              "infill_overlap",
+  insetCount:                "perimeters",
+  layerThickness:            "layer_height",
+  raft:                      "raft_layers",
+  filamentFlow:              "extrusion_multiplyer",
+  temperature:                "temperature",
+  temperature_bed:            "bed_temperature",
+  filamentDiameter:          "filament_diameter",
+  filamentDensity:            "filament_density",
+  filamentCost:               "filament_cost",
+  extrusionWidth:            "extrusion_width",
+  layer0extrusionWidth:      "first_layer_extrusion_width",
+  initialLayerThickness:      "first_layer_height",
+  downSkinCount:              "bottom_solid_layers",
+  upSkinCount:                "top_solid_layers",
+  initialLayerSpeed:         "first_layer_speed",
+  insetXSpeed:                "perimeter_speed",
+  infillPattern:              "fill_pattern",
+  moveSpeed:                  "travel_speed",
+  printSpeed:                "infill_speed",
+  solidInfillSpeed:           "solid_infill_speed",
+  solidTopInfillSpeed:        "top_solid_infill_speed",
+  fanFullOnLayerNr:          "full_fan_speed_layer",
+  enableCoolingFan:          "cooling",
+  startGCode:                "start_gcode",
+  endGCode:                  "end_gcode",
+  buildPlate:                 "circular",
+  buildPlate:                 "rectangular",
+  zLength:                    "max_print_height",
+  spiralizeMode:              "spiral_vase",
+  nozzleDiameter:            "nozzle_diameter",
+  nozzleSize:                "nozzle_diameter",
+  supportType:                "support_material",
+  support: {
+    supportXYDistance:              "support_material_spacing",
+    supportMaterialInterfaceLayers: "support_material_interface_layers",
+    supportMaterialBuildplateOnly:  "support_material_buildplate_only",
+    supportMaterialContactDistance: "support_material_contact_distance",
+    supportMaterialXYSpacing:       "support_material_xy_spacing",
+    supportMaterialThreshold:       "support_material_threshold"
+  },
+  cooling: {
+    fanFullOnLayerNr:         "full_fan_speed_layer",
+    coolingMinimalFeedrate:  "min_print_speed",
+    coolingFanSpeedMin:      "min_fan_speed",
+    coolingFanSpeedMax:      "max_fan_speed",
+  },
+  retractionAmount:          "retract_length",
+  retractionSpeed:            "retract_speed",
+  retraction : {
+    retractionMinimalDistance:  "retract_before_travel",
+    retractionZHop:          "retract_lift",
+  },
+  brim: {
+    brimLineCount:              "brim_width"
+  },
+  skirt: {
+    skirtDistance:              "skirt_distance",
+    skirtMinLength:          "min_skirt_length",
+    skirtLineCount:             "skirts"
+  }, 
+  raft: {
+    raftFirstLayerDensity:       "raft_first_layer_density"
+  }
+}
 
+
+const curaPropertiesNotUsedInPrusa = [
+  "retractionEnableCombing",
+  "retractionMinimalExtrusion",
+  "retractionAmountExtruderSwitch",
+  "coolingHeadLift",
+  "minimalLayerTime",
+  "inset0Speed" ,
+  "initialSpeedupLayers",
+  "temperature_2",
+  "raftMargin",
+  "raftLineSpacing",
+  "raftBaseLineWidth",
+  "raftBaseThickness",
+  "raftBaseSpeed",
+  "raftInterfaceLineSpacing",
+  "raftInterfaceThickness",
+  "raftInterfaceLinewidth",
+  "raftFanSpeed",
+  "raftSurfaceThickness",
+  "raftSurfaceLinewidth",
+  "raftSurfaceLineSpacing",
+  "raftSurfaceLayers",
+  "raftSurfaceSpeed",
+  "raftAirGap",
+  "raftAirGapLayer0",
+  "supportAngle",
+  "supportZDistance",
+  "supportLineDistance",
+  "infillSpeed"
+]
+"""
 		profile_from_engine_config = {
 			"layerthickness":       ("layer_height",       mm_from_um),
 			"printspeed":           ("print_speed",        no_translation),
