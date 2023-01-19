@@ -1373,14 +1373,24 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return None
 
 		printer_profile = self._printer_profile_manager.get_current_or_default()
+
+		# get a few ahead of time since other translations are dependent
+
+		# extrusion_width
 		extrusion_width = printer_profile["extruder"]["nozzleDiameter"]
 		if "extrusionWidth" in config.options("x"):
 			extrusion_width = config.get("x", "extrusionWidth")
+		elif "extrusion_width" in config.options("x"):
+			layer_height = config.get("x", "extrusion_width")
+
+		# layer_height
 		layer_height = 0.2
 		if "layerThickness" in config.options("x"):
 			layer_height = config.get("x", "layerThickness")
 		elif "layer_height" in config.options("x"):
 			layer_height = config.get("x", "layer_height")
+
+		# first layer height
 		init_layer_height = layer_height
 		if "initialLayerThickness" in config.options("x"):
 			init_layer_height = config.get("x", "initialLayerThickness")
@@ -1499,14 +1509,23 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"layerthickness":       ("layer_height",       mm_from_um),
 			"layer_height":         ("layer_height",       no_translation),
 			"printspeed":           ("print_speed",        no_translation),
+			"perimeter_speed":      ("print_speed",        no_translation),
 			"supporttype":          ("support_type",       lambda x: "lines" if x == 0 else "grid"),
+			"support_material":     ("support_type",       lambda x: "lines" if x == 0 else "grid"),
 			"infillspeed":          ("infill_speed",       no_translation),
+			"infill_speed":         ("infill_speed",       no_translation),
 			"infilloverlap":        ("fill_overlap",       no_translation),
+			"infill_overlap":       ("fill_overlap",       no_translation),
 			"filamentdiameter":     ("filament_diameter",  lambda x: [mm_from_um(x) for i in range(4)]),
+			"filament_diameter":    ("filament_diameter",  lambda x: [x for i in range(4)]),
 			"filamentflow":         ("filament_flow",      no_translation),
+			"extrusion_multiplyer": ("filament_flow",      no_translation),
 			"retractionamountextruderswitch": ("retraction_dual_amount", mm_from_um),
+			"retract_length_toolchange": ("retraction_dual_amount", no_translation),
 			"retractionamount":     ("retraction_amount",  mm_from_um),
+			"retract_length":       ("retraction_amount",  no_translation),
 			"retractionspeed":      ("retraction_speed",   no_translation),
+			"retract_speed":        ("retraction_speed",   no_translation),
 			"initiallayerthickness":("bottom_thickness",   mm_from_um),
 			"first_layer_height":   ("init_layer_height",  no_translation),
 			"extrusionwidth":       ("edge_width",         mm_from_um),
