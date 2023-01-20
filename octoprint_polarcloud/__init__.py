@@ -1397,6 +1397,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		elif "first_layer_height" in config.options("x"):
 			init_layer_height = config.getfloat("x", "first_layer_height")
 
+		# support
+		support = "None"
+		if "support_material" in config.options("x"):
+			value = config.getint("x", "support_material")
+			if value != 0:
+				support = "Touching Buildplate"
+
 		posx = 0
 		posy = 0
 		mm_from_um = lambda x: x / 1000.0
@@ -1412,9 +1419,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"printspeed":           ("print_speed",        no_translation),
 			"perimeter_speed":      ("print_speed",        no_translation),
 			"supporttype":          ("support_type",       lambda x: "lines" if x == 0 else "grid"),
-			"support_material":     ("support_type",       lambda x: "lines" if x == 0 else "grid"),
+			"support_material":     ("support",            lambda x: "None" if x == 0 else "Touching Buildplate"),
+			"fill_pattern":         (None, None),          # octoprint and legacy cura only support lines and grid
 			"infillspeed":          ("infill_speed",       no_translation),
 			"infill_speed":         ("infill_speed",       no_translation),
+			"solid_infill_speed":   (None, None),          # not sure where to send this one
+			"solidtopinfillspeed":  (None, None),          # not sure where to send this one
 			"infilloverlap":        ("fill_overlap",       no_translation),
 			"infill_overlap":       ("fill_overlap",       no_translation),
 			"filamentdiameter":     ("filament_diameter",  lambda x: [mm_from_um(x) for i in range(4)]),
@@ -1453,11 +1463,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"fill_density":         ("fill_density",       lambda x: 100.0 * extrusion_width / x),
 			"multivolumeoverlap":   ("overlap_dual",       mm_from_um),
 			"enableoozeshield":     ("ooze_shield",        bool_from_int),
+			"ooze_prevention":      ("ooze_shield",        bool_from_int),
 			"fanfullonlayernr":     ("fan_full_height",    lambda x: (x - 1) * layer_height + init_layer_height),
 			"full_fan_speed_layer": ("fan_full_height",    lambda x: (x - 1) * layer_height + init_layer_height),
-			"gcodeflavor":          ("gcode_flavor",       lambda x: "reprap"), # TODO: GPX -> RepRap
+			"gcodeflavor":          ("gcode_flavor",       lambda x: "reprap"),
+			"gcode_flavor":         ("gcode_flavor",       lambda x: "reprap"),
 			"autocenter":           (None, None),          # octoprint doesn't set
 			"objectsink":           ("object_sink",        mm_from_um),
+			"nozzle_diameter":      (None, None),          # octoprint always overrides with printer profile
+			"bed_shape":            (None, None),          # octoprint always overrides with printer profile
+			"rect_origin":          (None, None),          # octoprint always overrides with printer profile
 			"extruderoffset[0].x":  (None, None),          # octoprint always overrides with printer profile
 			"extruderoffset[0].y":  (None, None),          # octoprint always overrides with printer profile
 			"retractionminimaldistance": ("retraction_min_travel", mm_from_um),
@@ -1480,11 +1495,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"skirtlinecount":       ("skirt_line_count",   no_translation),
 			"skirts":               ("skirt_line_count",   no_translation),
 			"supportangle":         ("support_angle",      no_translation),
+			"support_material_threshold": ("support_angle",no_translation),
 			"supportxydistance":    ("support_xy_distance", mm_from_um),
 			"support_material_spacing": ("support_xy_distance", no_translation),
 			"support_material_xy_spacing": ("support_xy_distance", no_translation),
 			"supportzdistance":     ("support_z_distance", mm_from_um),
 			"supportlinedistance":  ("support_fill_rate",  lambda x: 100.0 * extrusion_width / mm_from_um(x)),
+			"support_material_buildplate_only": ("support", lambda x: "Touching Buildplate" if support != "None" else "None"),
 			"startcode":            ("start_gcode",        lambda x: ["(@ignore {print_temperature})\n(@ignore {print_bed_temperature})\n" + x[3:-3]]),
 			"start_gcode":          ("start_gcode",        lambda x: ["(@ignore {print_temperature})\n(@ignore {print_bed_temperature})\n" + x[3:-3]]),
 			"endcode":              ("end_gcode",          lambda x: [x[3:-3]]),
@@ -1505,7 +1522,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"raftsurfacelayers":    ("raft_surface_layers",no_translation),
 			"raftsurfacespeed":     (None, None),          # octoprint always uses bottom_layer_speed
 			"raftairgap":           ("raft_airgap_all",    mm_from_um),
-			"raftairgaplayer0":     (None, None)           # octoprint doesn't support a different airgap for layer0)
+			"raftairgaplayer0":     (None, None),          # octoprint doesn't support a different airgap for layer0)
+			"filament_cost":        (None, None),          # octoprint doesn't use these filament infos
+			"filament_density":     (None, None),          # octoprint doesn't use these filament infos
 		}
 
 		profile = dict()
