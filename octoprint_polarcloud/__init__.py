@@ -1379,23 +1379,23 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		# extrusion_width
 		extrusion_width = printer_profile["extruder"]["nozzleDiameter"]
 		if "extrusionWidth" in config.options("x"):
-			extrusion_width = config.get("x", "extrusionWidth")
+			extrusion_width = config.getfloat("x", "extrusionWidth") / 1000.0
 		elif "extrusion_width" in config.options("x"):
-			layer_height = config.get("x", "extrusion_width")
+			layer_height = config.getfloat("x", "extrusion_width")
 
 		# layer_height
 		layer_height = 0.2
 		if "layerThickness" in config.options("x"):
-			layer_height = config.get("x", "layerThickness")
+			layer_height = config.getfloat("x", "layerThickness") / 1000
 		elif "layer_height" in config.options("x"):
-			layer_height = config.get("x", "layer_height")
+			layer_height = config.getfloat("x", "layer_height")
 
 		# first layer height
 		init_layer_height = layer_height
 		if "initialLayerThickness" in config.options("x"):
-			init_layer_height = config.get("x", "initialLayerThickness")
+			init_layer_height = config.getfloat("x", "initialLayerThickness") / 1000
 		elif "first_layer_height" in config.options("x"):
-			init_layer_height = config.get("x", "first_layer_height")
+			init_layer_height = config.getfloat("x", "first_layer_height")
 
 		posx = 0
 		posy = 0
@@ -1404,107 +1404,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		width_from_line_count = lambda x: x * extrusion_width
 		height_from_layer_count = lambda x: x * layer_height
 		bool_from_int = lambda x: not not x
-#FUTURE WIP: mappings used by PolarCloud in the switch to the Prusa slicer
-#delete them as we cover them
-#const curaToPrusaMapping = {
-#  infillAmount:              "fill_density",
-#  infillOverlap:              "infill_overlap",
-#  insetCount:                "perimeters",
-#  layerThickness:            "layer_height",
-#  raft:                      "raft_layers",
-#  filamentFlow:              "extrusion_multiplyer",
-#  temperature:                "temperature",
-#  temperature_bed:            "bed_temperature",
-#  filamentDiameter:          "filament_diameter",
-#  filamentDensity:            "filament_density",
-#  filamentCost:               "filament_cost",
-#  extrusionWidth:            "extrusion_width",
-#  layer0extrusionWidth:      "first_layer_extrusion_width",
-#  initialLayerThickness:      "first_layer_height",
-#  downSkinCount:              "bottom_solid_layers",
-#  upSkinCount:                "top_solid_layers",
-#  initialLayerSpeed:         "first_layer_speed",
-#  insetXSpeed:                "perimeter_speed",
-#  infillPattern:              "fill_pattern",
-#  moveSpeed:                  "travel_speed",
-#  printSpeed:                "infill_speed",
-#  solidInfillSpeed:           "solid_infill_speed",
-#  solidTopInfillSpeed:        "top_solid_infill_speed",
-#  fanFullOnLayerNr:          "full_fan_speed_layer",
-#  enableCoolingFan:          "cooling",
-#  startGCode:                "start_gcode",
-#  endGCode:                  "end_gcode",
-#  buildPlate:                 "circular",
-#  buildPlate:                 "rectangular",
-#  zLength:                    "max_print_height",
-#  spiralizeMode:              "spiral_vase",
-#  nozzleDiameter:            "nozzle_diameter",
-#  nozzleSize:                "nozzle_diameter",
-#  supportType:                "support_material",
-#  support: {
-#    supportXYDistance:              "support_material_spacing",
-#    supportMaterialInterfaceLayers: "support_material_interface_layers",
-#    supportMaterialBuildplateOnly:  "support_material_buildplate_only",
-#    supportMaterialContactDistance: "support_material_contact_distance",
-#    supportMaterialXYSpacing:       "support_material_xy_spacing",
-#    supportMaterialThreshold:       "support_material_threshold"
-#  },
-#  cooling: {
-#    fanFullOnLayerNr:         "full_fan_speed_layer",
-#    coolingMinimalFeedrate:  "min_print_speed",
-#    coolingFanSpeedMin:      "min_fan_speed",
-#    coolingFanSpeedMax:      "max_fan_speed",
-#  },
-#  retractionAmount:          "retract_length",
-#  retractionSpeed:            "retract_speed",
-#  retraction : {
-#    retractionMinimalDistance:  "retract_before_travel",
-#    retractionZHop:          "retract_lift",
-#  },
-#  brim: {
-#    brimLineCount:              "brim_width"
-#  },
-#  skirt: {
-#    skirtDistance:              "skirt_distance",
-#    skirtMinLength:          "min_skirt_length",
-#    skirtLineCount:             "skirts"
-#  }, 
-#  raft: {
-#    raftFirstLayerDensity:       "raft_first_layer_density"
-#  }
-#}
-#
-#
-#const curaPropertiesNotUsedInPrusa = [
-#  "retractionEnableCombing",
-#  "retractionMinimalExtrusion",
-#  "retractionAmountExtruderSwitch",
-#  "coolingHeadLift",
-#  "minimalLayerTime",
-#  "inset0Speed" ,
-#  "initialSpeedupLayers",
-#  "temperature_2",
-#  "raftMargin",
-#  "raftLineSpacing",
-#  "raftBaseLineWidth",
-#  "raftBaseThickness",
-#  "raftBaseSpeed",
-#  "raftInterfaceLineSpacing",
-#  "raftInterfaceThickness",
-#  "raftInterfaceLinewidth",
-#  "raftFanSpeed",
-#  "raftSurfaceThickness",
-#  "raftSurfaceLinewidth",
-#  "raftSurfaceLineSpacing",
-#  "raftSurfaceLayers",
-#  "raftSurfaceSpeed",
-#  "raftAirGap",
-#  "raftAirGapLayer0",
-#  "supportAngle",
-#  "supportZDistance",
-#  "supportLineDistance",
-#  "infillSpeed"
-#]
+		self._logger.debug("layer_height={}; height_from_layer_count(3)={}".format(layer_height, height_from_layer_count(3)))
+
 		profile_from_engine_config = {
 			"layerthickness":       ("layer_height",       mm_from_um),
 			"layer_height":         ("layer_height",       no_translation),
@@ -1527,46 +1428,68 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			"retractionspeed":      ("retraction_speed",   no_translation),
 			"retract_speed":        ("retraction_speed",   no_translation),
 			"initiallayerthickness":("bottom_thickness",   mm_from_um),
-			"first_layer_height":   ("init_layer_height",  no_translation),
+			"first_layer_height":   ("bottom_thickness",   no_translation),
 			"extrusionwidth":       ("edge_width",         mm_from_um),
-			"insetcount":           ("wall_thickness",     width_from_line_count),
+			"extrusion_width":      ("edge_width",         no_translation),
+			"perimeters":           ("wall_thickness",     width_from_line_count),
 			"downskincount":        ("solid_layer_thickness", height_from_layer_count),
+			"bottom_solid_layers":  ("solid_layer_thickness", height_from_layer_count),
 			"upskincount":          ("solid_layer_thickness", height_from_layer_count),
+			"top_solid_layers":     ("solid_layer_thickness", height_from_layer_count),
 			"initialspeeduplayers": (None, None),          # octoprint always uses 4
 			"initiallayerspeed":    ("bottom_layer_speed", no_translation),
+			"first_layer_speed":    ("bottom_layer_speed", no_translation),
 			"inset0speed":          ("outer_shell_speed",  no_translation),
 			"insetxspeed":          ("inner_shell_speed",  no_translation),
 			"movespeed":            ("travel_speed",       no_translation),
+			"travel_speed":         ("travel_speed",       no_translation),
 			"minimallayertime":     ("cool_min_layer_time",no_translation),
 			"infillpattern":        (None, None),          # octoprint doesn't set
 			"layer0extrusionwidth": ("first_layer_width_factor", lambda x: mm_from_um(x) * 100.0 / extrusion_width),
+			"first_layer_extrusion_width": ("first_layer_width_factor", lambda x: x * 100.0 / extrusion_width),
 			"spiralizemode":        ("spiralize",          bool_from_int),
+			"spiral_vase":          ("spiralize",          bool_from_int),
 			"sparseinfilllinedistance": ("fill_density",   lambda x: 100.0 * extrusion_width / mm_from_um(x)),
+			"fill_density":         ("fill_density",       lambda x: 100.0 * extrusion_width / x),
 			"multivolumeoverlap":   ("overlap_dual",       mm_from_um),
 			"enableoozeshield":     ("ooze_shield",        bool_from_int),
 			"fanfullonlayernr":     ("fan_full_height",    lambda x: (x - 1) * layer_height + init_layer_height),
+			"full_fan_speed_layer": ("fan_full_height",    lambda x: (x - 1) * layer_height + init_layer_height),
 			"gcodeflavor":          ("gcode_flavor",       lambda x: "reprap"), # TODO: GPX -> RepRap
 			"autocenter":           (None, None),          # octoprint doesn't set
 			"objectsink":           ("object_sink",        mm_from_um),
 			"extruderoffset[0].x":  (None, None),          # octoprint always overrides with printer profile
 			"extruderoffset[0].y":  (None, None),          # octoprint always overrides with printer profile
 			"retractionminimaldistance": ("retraction_min_travel", mm_from_um),
+			"retract_before_travel": ("retraction_min_travel", no_translation),
 			"retractionzhop":       ("retraction_hop",     mm_from_um),
+			"retract_lift":         ("retraction_hop",     no_translation),
 			"minimalextrusionbeforeretraction": ("retraction_minimal_extrusion", mm_from_um),
 			"enablecombing":        ("retraction_combing", lambda x: "all" if x == 1 else ("no skin" if x == 2 else "off")),
 			"minimalfeedrate":      ("cool_min_feedrate",  no_translation),
+			"min_print_speed":      ("cool_min_feedrate",  no_translation),
 			"coolheadlift":         ("cool_head_lift",     bool_from_int),
 			"fanspeedmin":          ("fan_speed",          no_translation),
+			"min_fan_speed":        ("fan_speed",          no_translation),
 			"fanspeedmax":          ("fan_speed_max",      no_translation),
+			"max_fan_speed":        ("fan_speed_max",      no_translation),
 			"skirtdistance":        ("skirt_gap",          mm_from_um),
+			"skirt_distance":       ("skirt_gap",          no_translation),
 			"skirtminlength":       ("skirt_minimal_length", mm_from_um),
+			"min_skirt_length":     ("skirt_minimal_length", no_translation),
 			"skirtlinecount":       ("skirt_line_count",   no_translation),
+			"skirts":               ("skirt_line_count",   no_translation),
 			"supportangle":         ("support_angle",      no_translation),
 			"supportxydistance":    ("support_xy_distance", mm_from_um),
+			"support_material_spacing": ("support_xy_distance", no_translation),
+			"support_material_xy_spacing": ("support_xy_distance", no_translation),
 			"supportzdistance":     ("support_z_distance", mm_from_um),
 			"supportlinedistance":  ("support_fill_rate",  lambda x: 100.0 * extrusion_width / mm_from_um(x)),
 			"startcode":            ("start_gcode",        lambda x: ["(@ignore {print_temperature})\n(@ignore {print_bed_temperature})\n" + x[3:-3]]),
+			"start_gcode":          ("start_gcode",        lambda x: ["(@ignore {print_temperature})\n(@ignore {print_bed_temperature})\n" + x[3:-3]]),
 			"endcode":              ("end_gcode",          lambda x: [x[3:-3]]),
+			"end_gcode":            ("end_gcode",          lambda x: [x[3:-3]]),
+			"raft_layers":          ("raft_thickness",     height_from_layer_count),
 			"raftmargin":           ("raft_margin",        mm_from_um),
 			"raftlinespacing":      ("raft_line_spacing",  mm_from_um),
 			"raftbasethickness":    ("raft_base_thickness",mm_from_um),
@@ -1600,10 +1523,18 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				except:
 					# no float, use str
 					value = config.get("x", option)
+					if value.endswith("%"):
+						value = value[:len(value)-1]
+						try:
+							value = float(value)
+						except ValueError:
+							# leave it as a string
+							pass
 
 			if option in profile_from_engine_config:
 				key, translate = profile_from_engine_config[option]
 				if key:
+					self._logger.debug("key={}; value={}, {}".format(key, value, type(value)))
 					profile[key] = translate(value)
 					if "raft" in key:
 						profile["platform_adhesion"] = "raft"
