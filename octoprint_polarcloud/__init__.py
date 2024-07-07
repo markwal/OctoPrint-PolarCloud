@@ -52,7 +52,6 @@ from Cryptodome.Signature import pkcs1_15
 from Cryptodome.Hash import SHA256
 
 import socketio
-import time
 import sarge
 import flask
 from flask_babel import gettext, _
@@ -176,7 +175,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def get_settings_defaults(self, *args, **kwargs):
 		return dict(
-			service="https://status4test.polar3d.com",
+			service="https://printer2.polar3d.com",
 			service_ui="https://polar3d.com",
 			serial=None,
 			machine_type="Cartesian",
@@ -508,7 +507,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						self._status_now = False
 						self._logger.debug("_status_now break")
 						return False
-					time.sleep(1)
+					self._socket.sleep(1)
 					if not self._connected:
 						self._socket = None
 						return False
