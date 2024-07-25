@@ -175,7 +175,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def get_settings_defaults(self, *args, **kwargs):
 		return dict(
-			service="https://printer2.polar3d.com",
+			service="https://printer4.polar3d.com",
 			service_ui="https://polar3d.com",
 			serial=None,
 			machine_type="Cartesian",
@@ -268,7 +268,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._challenge = None
 			self._connected = True
 			self._hello_sent = False
-			self._socket = socketio.Client()
+			socketioLogging = self._settings.get(['verbose'])
+			self._socket = socketio.Client(logger=socketioLogging, engineio_logger=socketioLogging)
 		except:
 			self._socket = None
 			self._logger.exception('Unable to open socket {}'.format(get_exception_string()))
