@@ -51,7 +51,7 @@ from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import pkcs1_15
 from Cryptodome.Hash import SHA256
 
-from socketIO_client import SocketIO, LoggingNamespace, TimeoutError, ConnectionError
+import socketio
 import sarge
 import flask
 from flask_babel import gettext, _
@@ -79,7 +79,7 @@ def get_ip():
 	return octoprint.util.address_for_client("google.com", 80)
 
 # take a server relative or localhost url and attempt to make absolute an absolute
-# url out of it  (guess about which interface)
+# url out of it python-socketio(guess about which interface)
 def normalize_url(url):
 	urlp = urlparse(url)
 	scheme = urlp.scheme
@@ -175,7 +175,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def get_settings_defaults(self, *args, **kwargs):
 		return dict(
-			service="https://printer2.polar3d.com",
+			service="https://printer4.polar3d.com",
 			service_ui="https://polar3d.com",
 			serial=None,
 			machine_type="Cartesian",
@@ -268,8 +268,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._challenge = None
 			self._connected = True
 			self._hello_sent = False
-			self._socket = SocketIO(self._settings.get(['service']), Namespace=LoggingNamespace, verify=True, wait_for_connection=False)
-		except (TimeoutError, ConnectionError, StopIteration):
+			socketioLogging = self._settings.get(['verbose'])
+			self._socket = socketio.Client(logger=socketioLogging, engineio_logger=socketioLogging)
+		except:
 			self._socket = None
 			self._logger.exception('Unable to open socket {}'.format(get_exception_string()))
 			return
@@ -291,6 +292,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._socket.on('customCommand', self._on_custom_command)
 		self._socket.on('jogPrinter', self._on_jog_printer)
 		self._socket.on('unregisterResponse', self._on_unregister_response)
+		self._socket.connect(self._settings.get(['service']))
+
 
 	def _start_polar_status(self):
 		if self._polar_status_worker:
@@ -505,7 +508,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						self._status_now = False
 						self._logger.debug("_status_now break")
 						return False
-					self._socket.wait(seconds=1)
+					self._socket.sleep(1)
 					if not self._connected:
 						self._socket = None
 						return False
