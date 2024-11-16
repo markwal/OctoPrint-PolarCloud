@@ -954,21 +954,32 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 
 		self._job_id = "123"
+		stl = False
 		gcode = False
+		threemf = False
+		ext = '.stl'
 		print_file = ''
-		if 'gcodeFile' in data:
+		if 'threemfFile' in data:
+			threemf = True
+			print_file = data['threemfFile']
+			ext = '.3mf'
+		elif 'gcodeFile' in data:
 			gcode = True
 			print_file = data['gcodeFile']
+			ext = '.gcode'
 		elif 'stlFile' in data:
+			stl = True
 			print_file = data['stlFile']
 		else:
 			self._logger.warn("PolarCloud sent print command without a print file path.")
 			return
+		self._logger.debug("PolarCloud requested to print {}. Downloading to a file with ext: {}.".format(print_file, ext))
 
 		info = {}
 		pos = (0, 0)
 		slicer = 'curalegacy'
-		if not gcode:
+		if stl:
+			self._logger.debug("Checking slicer configuration.")
 			# need to slice then, so make sure we're set up to do that
 			if not 'configFile' in data:
 				self._logger.warn("PolarCloud sent print command without slicing profile.")
@@ -991,6 +1002,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				self._logger.warn("Unable to create slicing profile. Aborting slice and print.")
 				return
 
+		# get the print_file from the cloud
 		# TODO: use tornado async I/O to get the print file?
 		try:
 			info['file'] = print_file
@@ -1003,7 +1015,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		path = self._file_manager.add_folder(FileDestinations.LOCAL, "polarcloud")
 		path = self._file_manager.join_path(FileDestinations.LOCAL, path, "current-print")
 		pathGcode = path + ".gcode"
-		path = path + (".gcode" if gcode else ".stl")
+		path = path + ext
+		self._logger.debug("Adding PolarCloud download as {}".format(path))
 		self._file_manager.add_file(FileDestinations.LOCAL, path, StreamWrapper(path, BytesIO(req_stl.content)), allow_overwrite=True)
 		job_id = data['jobId'] if 'jobId' in data else "123"
 		self._logger.debug("print jobId is {}".format(job_id))
@@ -1021,7 +1034,15 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._cloud_print_info = info
 		self._status_now = True
 
-		if not gcode:
+		def _on_upload_success(filename, full_path, destination):
+			self._printer.select_file(full_path, destination == FileDestinations.SDCARD, printAfterSelect=True)
+
+		if threemf:
+			# upload the 3mf file to the printer's SD card
+			self._printer.add_sd_file(path,
+					self._file_manager.path_on_disk(FileDestinations.LOCAL, path), 
+					on_success=_on_upload_success)
+		elif stl:
 			# prepare the gcode file by slicing
 			self._print_preparer = PolarPrintPreparer(slicer,
 					self._file_manager, path, pathGcode, pos,
