@@ -1039,7 +1039,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		if threemf:
 			# upload the 3mf file to the printer's SD card
-			self._printer.add_sd_file(path,
+			self._printer.add_sd_file("polar-cloud.gcode.3mf",
 					self._file_manager.path_on_disk(FileDestinations.LOCAL, path), 
 					on_success=_on_upload_success)
 		elif stl:
