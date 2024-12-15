@@ -954,31 +954,37 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 
 		self._job_id = "123"
-		stl = False
-		gcode = False
-		threemf = False
-		ext = '.stl'
+
+		# if the service doesn't tell us which type to print, we'll assume that
+		# we're supposed to download and print the gcode, unless they didn't give
+		# us a gcode file, then we'll try to download and slice the model
+		print_type = 'stlFile'
 		print_file = ''
-		if 'threemfFile' in data:
-			threemf = True
-			print_file = data['threemfFile']
-			ext = '.3mf'
+		if 'fileToPrint' in data:
+			print_type = data['fileToPrint']
 		elif 'gcodeFile' in data:
-			gcode = True
-			print_file = data['gcodeFile']
-			ext = '.gcode'
-		elif 'stlFile' in data:
-			stl = True
-			print_file = data['stlFile']
-		else:
-			self._logger.warn("PolarCloud sent print command without a print file path.")
+			print_type = 'gcodeFile'
+		if not print_type in data:
+			self._logger.warn("PolarCloud sent print command, but data didn't contain a {} url.", print_type)
 			return
+		print_file = data[print_type]
+
+		# figure out the extension for the destination file (for the download)
+		mapTypeToExt = {
+			'threemfFile' : '.3mf',
+			'gcodeFile' : '.gcode',
+			'stlFile' : '.stl'
+			}
+		if not print_type in mapTypeToExt:
+			self._logger.warn("PolarCloud asked us to print the {}, but this plugin doesn't know how to handle that type.", print_type)
+		ext = mapTypeToExt[print_type]
+
 		self._logger.debug("PolarCloud requested to print {}. Downloading to a file with ext: {}.".format(print_file, ext))
 
 		info = {}
 		pos = (0, 0)
 		slicer = 'curalegacy'
-		if stl:
+		if print_type == 'stlFile':
 			self._logger.debug("Checking slicer configuration.")
 			# need to slice then, so make sure we're set up to do that
 			if not 'configFile' in data:
@@ -1037,12 +1043,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		def _on_upload_success(filename, full_path, destination):
 			self._printer.select_file(full_path, destination == FileDestinations.SDCARD, printAfterSelect=True)
 
-		if threemf:
+		if print_type == 'threemfFile':
 			# upload the 3mf file to the printer's SD card
 			self._printer.add_sd_file("polar-cloud.gcode.3mf",
 					self._file_manager.path_on_disk(FileDestinations.LOCAL, path), 
 					on_success=_on_upload_success)
-		elif stl:
+		elif print_type == 'stlFile':
 			# prepare the gcode file by slicing
 			self._print_preparer = PolarPrintPreparer(slicer,
 					self._file_manager, path, pathGcode, pos,
