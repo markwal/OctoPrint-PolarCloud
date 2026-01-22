@@ -56,7 +56,118 @@ import sarge
 import flask
 from flask_babel import gettext, _
 import requests
-from PIL import Image
+try:
+	from PIL import Image
+	_pillow_available = True
+except ImportError:
+	_pillow_available = False
+
+import subprocess
+import tempfile
+
+def _find_ffmpeg():
+	"""Find ffmpeg in common paths, returns path or None if not found."""
+	common_paths = [
+		"/ac_lib/lib/third_bin/ffmpeg",  # Anycubic Kobra
+		"/usr/bin/ffmpeg",
+		"/usr/local/bin/ffmpeg",
+		"/opt/bin/ffmpeg",
+		"/opt/local/bin/ffmpeg",
+	]
+	for path in common_paths:
+		if os.path.isfile(path) and os.access(path, os.X_OK):
+			return path
+	return None
+
+_ffmpeg_path = _find_ffmpeg()
+
+def _resize_image_ffmpeg(image_bytes, max_size, logger):
+	"""
+	Resize/compress image using ffmpeg when PIL is not available.
+	Tries lowering JPEG quality first, then scales down if needed.
+	Returns compressed image bytes or original if ffmpeg unavailable/fails.
+	"""
+	if not _ffmpeg_path:
+		return image_bytes
+
+	# Quality levels to try (lower = better quality, higher = more compression)
+	quality_levels = [5, 10, 15, 20, 25, 31]
+	# Scale widths to try if quality adjustment isn't enough
+	scale_widths = [640, 480, 320]
+
+	with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as infile:
+		infile.write(image_bytes)
+		infile_path = infile.name
+
+	try:
+		# First try quality reduction without scaling
+		for quality in quality_levels:
+			with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as outfile:
+				outfile_path = outfile.name
+
+			try:
+				cmd = [
+					_ffmpeg_path, '-y', '-i', infile_path,
+					'-q:v', str(quality),
+					outfile_path
+				]
+				result = subprocess.run(cmd, capture_output=True, timeout=30)
+				if result.returncode == 0 and os.path.exists(outfile_path):
+					with open(outfile_path, 'rb') as f:
+						compressed = f.read()
+					if len(compressed) <= max_size:
+						logger.debug("ffmpeg compressed image to {} bytes with quality {}".format(
+							len(compressed), quality))
+						return compressed
+			except subprocess.TimeoutExpired:
+				logger.warning("ffmpeg timed out during quality compression")
+			except Exception as e:
+				logger.warning("ffmpeg quality compression failed: {}".format(e))
+			finally:
+				try:
+					os.unlink(outfile_path)
+				except:
+					pass
+
+		# If quality reduction wasn't enough, try scaling down
+		for width in scale_widths:
+			for quality in quality_levels:
+				with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as outfile:
+					outfile_path = outfile.name
+
+				try:
+					cmd = [
+						_ffmpeg_path, '-y', '-i', infile_path,
+						'-vf', 'scale={}:-1'.format(width),
+						'-q:v', str(quality),
+						outfile_path
+					]
+					result = subprocess.run(cmd, capture_output=True, timeout=30)
+					if result.returncode == 0 and os.path.exists(outfile_path):
+						with open(outfile_path, 'rb') as f:
+							compressed = f.read()
+						if len(compressed) <= max_size:
+							logger.debug("ffmpeg compressed image to {} bytes with quality {} and width {}".format(
+								len(compressed), quality, width))
+							return compressed
+				except subprocess.TimeoutExpired:
+					logger.warning("ffmpeg timed out during scale compression")
+				except Exception as e:
+					logger.warning("ffmpeg scale compression failed: {}".format(e))
+				finally:
+					try:
+						os.unlink(outfile_path)
+					except:
+						pass
+
+		logger.warning("ffmpeg could not compress image below max size {}".format(max_size))
+		return image_bytes
+
+	finally:
+		try:
+			os.unlink(infile_path)
+		except:
+			pass
 
 import octoprint.plugin
 import octoprint.util
@@ -644,25 +755,61 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		try:
 			image_bytes = r.content
 			image_size = len(image_bytes)
-			if self._image_transpose or image_size > self._max_image_size:
-				self._logger.debug("Recompressing snapshot to smaller size")
-				buf = BytesIO()
-				buf.write(image_bytes)
-				image = Image.open(buf)
-				image.thumbnail((640, 480))
-				if self._settings.global_get(["webcam", "flipH"]):
-					image = image.transpose(Image.FLIP_LEFT_RIGHT)
-				if self._settings.global_get(["webcam", "flipV"]):
-					image = image.transpose(Image.FLIP_TOP_BOTTOM)
-				if self._settings.global_get(["webcam", "rotate90"]):
-					image = image.transpose(Image.ROTATE_90)
-				image_bytes = BytesIO()
-				image.save(image_bytes, format="jpeg")
-				image_bytes.seek(0, 2)
-				new_image_size = image_bytes.tell()
-				image_bytes.seek(0)
-				self._logger.debug("Image transcoded from size {} to {}".format(image_size, new_image_size))
-				image_size = new_image_size
+			needs_transform = self._image_transpose
+			needs_resize = image_size > self._max_image_size
+
+			if needs_transform or needs_resize:
+				if _pillow_available:
+					# Use PIL for resize and transforms
+					self._logger.debug("Using PIL to process snapshot")
+					buf = BytesIO()
+					buf.write(image_bytes)
+					image = Image.open(buf)
+					image.thumbnail((640, 480))
+					if self._settings.global_get(["webcam", "flipH"]):
+						image = image.transpose(Image.FLIP_LEFT_RIGHT)
+					if self._settings.global_get(["webcam", "flipV"]):
+						image = image.transpose(Image.FLIP_TOP_BOTTOM)
+					if self._settings.global_get(["webcam", "rotate90"]):
+						image = image.transpose(Image.ROTATE_90)
+					# Try different quality levels to get under max_size
+					for quality in [85, 70, 55, 40, 25]:
+						output = BytesIO()
+						image.save(output, format="jpeg", quality=quality)
+						output.seek(0, 2)
+						new_image_size = output.tell()
+						if new_image_size <= self._max_image_size:
+							output.seek(0)
+							image_bytes = output
+							self._logger.debug("PIL compressed image from {} to {} bytes (quality {})".format(
+								image_size, new_image_size, quality))
+							image_size = new_image_size
+							break
+					else:
+						# Even lowest quality didn't work, use it anyway
+						output.seek(0)
+						image_bytes = output
+						self._logger.debug("PIL compressed image from {} to {} bytes (min quality)".format(
+							image_size, new_image_size))
+						image_size = new_image_size
+				elif _ffmpeg_path:
+					# Fall back to ffmpeg for compression (no transforms)
+					if needs_transform:
+						self._logger.warning("PIL not available, ffmpeg cannot apply image transforms (flip/rotate)")
+					if needs_resize:
+						self._logger.debug("Using ffmpeg to compress snapshot")
+						compressed = _resize_image_ffmpeg(image_bytes, self._max_image_size, self._logger)
+						if compressed != image_bytes:
+							image_bytes = compressed
+							image_size = len(image_bytes)
+				else:
+					# Neither PIL nor ffmpeg available
+					if needs_transform:
+						self._logger.warning("Neither PIL nor ffmpeg available, skipping image transformation")
+					if needs_resize:
+						self._logger.warning("Neither PIL nor ffmpeg available, image size {} exceeds max {} but uploading anyway".format(
+							image_size, self._max_image_size))
+
 			if image_size == 0:
 				self._logger.debug("Image content is length 0 from {}, not uploading to PolarCloud".format(self._snapshot_url))
 				return
