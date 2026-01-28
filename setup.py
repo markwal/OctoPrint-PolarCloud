@@ -67,7 +67,7 @@ except:
 	print("Unable to import Raspberry Pi wheels due to exception, building the slow way.")
 
 if add_pillow:
-	plugin_requires = ["Pillow"] + plugin_requires
+	plugin_requires = ["Pillow>=9.0.0,<12.0.0"] + plugin_requires
 
 setup_parameters = octoprint_setuptools.create_plugin_setup_parameters(
 	identifier=plugin_identifier,
