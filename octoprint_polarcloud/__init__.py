@@ -1585,7 +1585,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			import ConfigParser as configparser
 		config = configparser.ConfigParser(interpolation=None)
 		try:
-			config.readfp(config_file)
+			config.read_file(config_file)
 		except:
 			self._logger.exception("Error while reading PolarCloud slicing configuration.")
 			return None
