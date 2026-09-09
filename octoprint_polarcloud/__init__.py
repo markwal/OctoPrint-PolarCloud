@@ -320,6 +320,11 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			less=["less/polarcloud.less"]
 		)
 
+	##~~ TemplatePlugin mixin
+
+	def is_template_autoescaped(self, *args, **kwargs):
+		return True
+
 	##~~ Softwareupdate hook
 
 	def get_update_information(self, *args, **kwargs):
