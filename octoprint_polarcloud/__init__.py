@@ -1488,6 +1488,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def is_api_adminonly(self, *args, **kwargs):
 		return True
 
+	def is_api_protected(self, *args, **kwargs):
+		return True
+
 	def on_api_command(self, command, data):
 		status='FAIL'
 		message=''
