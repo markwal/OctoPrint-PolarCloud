@@ -269,7 +269,6 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._disconnect_on_unregister = False
 		self._hello_sent = False
 		self._port = 80
-		self._octoprint_client = None
 		self._capabilities = None
 		self._next_pending = False
 		self._print_preparer = None
@@ -1264,11 +1263,14 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	#~~ customCommandList -> polar: customCommand
 
-	def _ensure_octoprint_client(self):
-		if not self._octoprint_client:
-			baseurl = octoprint_client.build_base_url(host="127.0.0.1", port=self._port)
-			self._octoprint_client = octoprint_client.Client(baseurl, self._settings.global_get(['api', 'key']))
-		return self._octoprint_client
+	def _get_api_key(self):
+		if hasattr(octoprint.plugin.OctoPrintPlugin, 'plugin_apikey'):
+			return self.plugin_apikey
+		return self._settings.global_get(['api', 'key'])
+
+	def _get_octoprint_client(self):
+		baseurl = octoprint_client.build_base_url(host="127.0.0.1", port=self._port)
+		return octoprint_client.Client(baseurl, self._get_api_key())
 
 	def _custom_command_list(self):
 		def _polar_custom_from_command(source, command):
@@ -1285,7 +1287,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		command_list = []
 		if self._settings.get_boolean(['enable_system_commands']):
 			try:
-				client = self._ensure_octoprint_client()
+				client = self._get_octoprint_client()
 				r = client.get("/api/system/commands")
 				r.raise_for_status()
 				commands_by_type = json.loads(r.content)
@@ -1316,7 +1318,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if 'command' not in data:
 				self._logger.warn("Ignoring custom command, no 'command' element: {}".format(repr(data)))
 				return
-			client = self._ensure_octoprint_client()
+			client = self._get_octoprint_client()
 
 			r = client.post("/api/system/commands/" + data['command'], {})
 			r.raise_for_status()
@@ -1340,7 +1342,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if jog_data['command'] == 'extrude':
 			api_command = "tool"
 
-		client = self._ensure_octoprint_client()
+		client = self._get_octoprint_client()
 		r = client.post_json("/api/printer/" + api_command, data['jogPrinter'])
 		r.raise_for_status()
 
