@@ -174,7 +174,7 @@ import octoprint_client
 from octoprint.util import get_exception_string
 from octoprint.events import Events
 from octoprint.filemanager import FileDestinations
-from octoprint.filemanager.util import StreamWrapper
+from octoprint.filemanager.util import DiskFileWrapper, StreamWrapper
 from octoprint.slicing.exceptions import UnknownSlicer, SlicerNotConfigured
 
 # logging.getLogger('socketIO-client').setLevel(logging.DEBUG)
@@ -1191,11 +1191,11 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		self._status_now = True
 
 		def _on_upload_success(filename, full_path, destination):
-			self._printer.select_file(full_path, destination == FileDestinations.SDCARD, printAfterSelect=True)
+			self._select_and_print(destination, full_path)
 
 		if print_type == 'threemfFile':
 			# upload the 3mf file to the printer's SD card
-			self._printer.add_sd_file("polar-cloud.gcode.3mf",
+			self._add_sd_file("polar-cloud.gcode.3mf",
 					self._file_manager.path_on_disk(FileDestinations.LOCAL, path), 
 					on_success=_on_upload_success)
 		elif print_type == 'stlFile':
@@ -1208,6 +1208,34 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		else:
 			self._on_slicing_complete(self._file_manager.path_on_disk(FileDestinations.LOCAL, path))
 
+	def _select_and_print(self, destination, path):
+		if hasattr(self._printer, 'set_job'):
+			job = self._file_manager.create_job(destination, self._file_manager.path_in_storage(destination, path))
+			self._printer.set_job(job, print_after_select=True)
+		else:
+			self._printer.select_file(path, destination == FileDestinations.SDCARD, printAfterSelect=True)
+
+	def _add_sd_file(self, filename, local_path, on_success):
+		if not hasattr(self._printer, 'set_job'):
+			self._printer.add_sd_file(filename, local_path, on_success=on_success)
+			return
+
+		remote = []
+
+		def _on_upload_done():
+			if not remote:
+				self._logger.error("Upload to printer storage finished without a file name")
+				return
+			on_success(remote[0], remote[0], FileDestinations.SDCARD)
+
+		def _on_progress(progress=None, done=False, failed=False, *args, **kwargs):
+			if done:
+				self._task_queue.put(_on_upload_done)
+
+		remote.append(self._file_manager.add_file(FileDestinations.SDCARD, filename,
+				DiskFileWrapper(filename, local_path, move=False),
+				allow_overwrite=True, progress_callback=_on_progress))
+
 	def _on_slicing_failed(self, e):
 		self._logger.exception("Unable to slice.")
 		self._pstate = self.PSTATE_ERROR
@@ -1218,7 +1246,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		# TODO store self._cloud_print_info[sliceDetails]
 		self._logger.debug("_on_slicing_complete")
 		self._pstate = self.PSTATE_PRINTING
-		self._printer.select_file(path, False, printAfterSelect=True)
+		self._select_and_print(FileDestinations.LOCAL, path)
 		self._update_interval = 10
 		self._status_now = True
 		self._print_preparer = None
