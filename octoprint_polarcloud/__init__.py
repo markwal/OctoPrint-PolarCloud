@@ -453,7 +453,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			with open(key_filename) as f:
 				key = f.read()
 			if force_regen and len(key) <= 0:
-				self._logger.warn("Found zero length key, generating a new key")
+				self._logger.warning("Found zero length key, generating a new key")
 				self._generate_key(key_filename)
 				with open(key_filename) as f:
 					key = f.read()
@@ -654,7 +654,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					_wait_and_process(10)
 				else:
 					reconnection_delay = random.uniform(1.5, 3)
-					self._logger.warn("unable to create socket to Polar Cloud, check again in {} seconds".format(reconnection_delay))
+					self._logger.warning("unable to create socket to Polar Cloud, check again in %s seconds", reconnection_delay)
 					try:
 						sleep(reconnection_delay)
 						self._create_socket()
@@ -705,7 +705,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 				self._logger.info("Socket disconnected, clear and restart")
 				if status_sent < 3 and not self._disconnect_on_register and not self._disconnect_on_unregister:
-					self._logger.warn("Unable to connect to Polar Cloud")
+					self._logger.warning("Unable to connect to Polar Cloud")
 					break
 				self._socket = None
 				self._logger.debug("bottom of forever")
@@ -852,11 +852,10 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.warn('getUrlResponse lacks status property')
 			return
 		if not response['status'] == 'SUCCESS':
-			self._logger.warn('Failed to get upload url: {} {}'
-				.format(response['status'], response.get('message', '')))
+			self._logger.warning('Failed to get upload url: %s %s', response['status'], response.get('message', ''))
 			return
 		if not has_all(response, 'type', 'expires', 'url', 'maxSize', 'fields'):
-			self._logger.warn('getUrlResponse lacks a required property')
+			self._logger.warning('getUrlResponse lacks a required property')
 		response["expires"] = (datetime.datetime.now() + datetime.timedelta(seconds=int(response.get("expires", 0))))
 		if not has_all(response, 'jobID'):
 			response["jobID"] = self._job_id
@@ -1096,11 +1095,11 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._valid_packet(data):
 			return
 		if self._print_preparer and self._print_preparer.is_alive():
-			self._logger.warn("PolarCloud sent a print command, but the plugin thinks we're still slicing.")
+			self._logger.warning("PolarCloud sent a print command, but the plugin thinks we're still slicing.")
 			return
 
 		if self._printer.is_printing() or self._printer.is_paused():
-			self._logger.warn("PolarCloud sent print command, but OctoPrint is already printing.")
+			self._logger.warning("PolarCloud sent print command, but OctoPrint is already printing.")
 			return
 
 		self._job_id = "123"
@@ -1115,7 +1114,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		elif 'gcodeFile' in data:
 			print_type = 'gcodeFile'
 		if print_type not in data:
-			self._logger.warn("PolarCloud sent print command, but data didn't contain a {} url.", print_type)
+			self._logger.warning("PolarCloud sent print command, but data didn't contain a %s url.", print_type)
 			return
 		print_file = data[print_type]
 
@@ -1126,7 +1125,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			'stlFile' : '.stl'
 			}
 		if print_type not in mapTypeToExt:
-			self._logger.warn("PolarCloud asked us to print the {}, but this plugin doesn't know how to handle that type.", print_type)
+			self._logger.warning("PolarCloud asked us to print the %s, but this plugin doesn't know how to handle that type.", print_type)
 		ext = mapTypeToExt[print_type]
 
 		self._logger.debug("PolarCloud requested to print {}. Downloading to a file with ext: {}.".format(print_file, ext))
@@ -1138,7 +1137,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.debug("Checking slicer configuration.")
 			# need to slice then, so make sure we're set up to do that
 			if 'configFile' not in data:
-				self._logger.warn("PolarCloud sent print command without slicing profile.")
+				self._logger.warning("PolarCloud sent print command without slicing profile.")
 				return
 			info['config'] = data['configFile']
 			try:
@@ -1155,7 +1154,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				#TODO tell PolarCloud that we don't have a slicer so it can tell the user
 				pass
 			if slicing_profile is None:
-				self._logger.warn("Unable to create slicing profile. Aborting slice and print.")
+				self._logger.warning("Unable to create slicing profile. Aborting slice and print.")
 				return
 
 		# get the print_file from the cloud
@@ -1336,7 +1335,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._sent_command_list = command_list
 			self._logger.debug("customCommandList sent.")
 		else:
-			self._logger.warn("customCommandList generated, but dropped because no changes detected.")
+			self._logger.warning("customCommandList generated, but dropped because no changes detected.")
 
 	def _on_custom_command(self, data, *args, **kwargs):
 		self._logger.debug("customCommand: {}".format(repr(data)))
@@ -1344,7 +1343,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 		try:
 			if 'command' not in data:
-				self._logger.warn("Ignoring custom command, no 'command' element: {}".format(repr(data)))
+				self._logger.warning("Ignoring custom command, no 'command' element: %s", repr(data))
 				return
 			client = self._get_octoprint_client()
 
@@ -1358,9 +1357,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ jogPrinter
 
 	def _on_jog_printer(self, data, *args, **kwargs):
-		self._logger.warn("Jog request: {}".format(repr(data)))
+		self._logger.warning("Jog request: %s", repr(data))
 		if 'jogPrinter' not in data:
-			self._logger.warn("Ignoring jogPrinter command, no jogPrinter in data: {}".format(repr(data)))
+			self._logger.warning("Ignoring jogPrinter command, no jogPrinter in data: %s", repr(data))
 			return
 		# The data object should have a jogPrinter field which containts
 		# the JSON object that the Octopi API is expecting
@@ -1392,7 +1391,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 
 		if running_version == 'unknown' or latest_version == 'unknown':
-			self._logger.warn("Unable to determine current version or available version of OctoPrint")
+			self._logger.warning("Unable to determine current version or available version of OctoPrint")
 			return
 
 		self._logger.debug('setVersion')
@@ -1799,7 +1798,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			elif option == "posy":
 				posy = mm_from_um(value)
 			else:
-				self._logger.warn("PolarCloud slicing profile contains unrecognized setting {}={}".format(option, value))
+				self._logger.warning("PolarCloud slicing profile contains unrecognized setting %s=%s", option, value)
 
 		self._logger.debug("Profile looks like this: {}".format(repr(profile)))
 		profile["fan_enabled"] = "fan_speed_max" in profile and profile["fan_speed_max"] > 0
@@ -1842,7 +1841,7 @@ class PolarTimelapseTranscoder(object):
 		try:
 			p = sarge.run(command, stdout=sarge.Capture(), stderr=sarge.Capture())
 			if p.returncode != 0:
-				self._logger.warn("Could not render movie, got return code {returncode}: {stderr_text}".format(returncode=p.returncode, stderr_text=p.stderr.text))
+				self._logger.warning("Could not render movie, got return code %s: %s", p.returncode, p.stderr.text)
 			else:
 				self._logger.debug("gstreamer succeded: {}".format(p.stdout.text))
 				self._callback(self._polar_movie)
