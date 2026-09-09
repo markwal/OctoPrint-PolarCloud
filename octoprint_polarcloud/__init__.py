@@ -367,8 +367,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _valid_packet(self, data):
 		if not self._serial or self._serial != data.get("serialNumber", ""):
-			self._logger.debug("Serial number is '{}'".format(repr(self._serial)))
-			self._logger.debug("Ignoring message (mismatch serial): {}".format(repr(data)))
+			self._logger.debug("Serial number is '%s'", repr(self._serial))
+			self._logger.debug("Ignoring message (mismatch serial): %s", repr(data))
 			return False
 		return True
 
@@ -386,7 +386,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._socket = socketio.Client(logger=socketioLogging, engineio_logger=socketioLogging)
 		except:
 			self._socket = None
-			self._logger.exception('Unable to open socket {}'.format(get_exception_string()))
+			self._logger.exception('Unable to open socket %s', get_exception_string())
 			return
 
 		# Register all the socket messages
@@ -429,7 +429,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			p = sarge.run(command_line, stderr=sarge.Capture())
 			return (p.returncode, p.stderr.text)
 		except:
-			self._logger.exception("Failed to run system command: {}".format(command_line))
+			self._logger.exception("Failed to run system command: %s", command_line)
 			return (1, "")
 
 	def _generate_key(self, key_filename):
@@ -446,7 +446,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	def _get_keys(self, force_regen = False):
 		data_folder = self.get_plugin_data_folder()
 		key_filename = os.path.join(data_folder, 'p3d_key')
-		self._logger.debug('key_filename: {}'.format(key_filename))
+		self._logger.debug('key_filename: %s', key_filename)
 		if force_regen or not os.path.isfile(key_filename):
 			self._generate_key(key_filename)
 		try:
@@ -475,7 +475,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				command_line = "ssh-keygen -e -m PEM -f {key_filename} > {pubkey_filename}".format(key_filename=key_filename, pubkey_filename=pubkey_filename)
 				returncode, stderr_text = self._system(command_line)
 				if returncode != 0:
-					self._logger.error("Unable to generate public key (may need to manually upgrade pyOpenSSL, see README) {}: {}".format(returncode, stderr_text))
+					self._logger.error("Unable to generate public key (may need to manually upgrade pyOpenSSL, see README) %s: %s", returncode, stderr_text)
 					self._key = None
 					try:
 						os.remove(pubkey_filename)
@@ -525,13 +525,13 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if self._pstate == self.PSTATE_POSTPROCESSING:
 				return self._pstate
 
-		self._logger.debug("OctoPrint state: {}".format(self._printer.get_state_id()))
+		self._logger.debug("OctoPrint state: %s", self._printer.get_state_id())
 		state_id = self._printer.get_state_id()
 		state = self.PSTATE_ERROR
 		try:
 			state = state_mapping[state_id]
 		except KeyError:
-			self._logger.exception("Unknown OctoPrint status, mapping to error state for PolarCloud: {}".format(state_id))
+			self._logger.exception("Unknown OctoPrint status, mapping to error state for PolarCloud: %s", state_id)
 
 		if state == self.PSTATE_SERIAL:
 			# if we were ever printing, we owe a "job" completion message
@@ -553,7 +553,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _current_status(self):
 		temps = self._printer.get_current_temperatures()
-		self._logger.debug("temps: {}".format(repr(temps)))
+		self._logger.debug("temps: %s", repr(temps))
 		status = {
 			"serialNumber": self._serial,
 			"status": self._polar_status_from_state(),
@@ -591,7 +591,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		if self._printer.is_printing() or self._printer.is_paused():
 			data = self._printer.get_current_data()
-			self._logger.debug("get_current_data() is {}".format(repr(data)))
+			self._logger.debug("get_current_data() is %s", repr(data))
 			status["progress"] = str_safe_get(data, 'state', 'text')
 			status["progressDetail"] = "Printing Job: {} Percent Complete: {:0.1f}%".format(
 				str_safe_get(data, 'file', 'name'), float_safe_get(data, 'progress', 'completion'))
@@ -648,7 +648,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._shutdown = False
 
 			while not self._shutdown:
-				self._logger.debug("self._socket: {}".format(repr(self._socket)))
+				self._logger.debug("self._socket: %s", repr(self._socket))
 				if self._socket:
 					self._logger.debug("_wait_and_process")
 					_wait_and_process(10)
@@ -677,7 +677,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				while self._connected:
 					status, target_set = self._current_status()
 					self._status = status
-					self._logger.debug("emit status: {}".format(repr(status)))
+					self._logger.debug("emit status: %s", repr(status))
 					self._socket.emit("status", status)
 					status_sent += 1
 
@@ -732,7 +732,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._snapshot_url:
 			return False
 		if upload_type != 'idle' and upload_type in self._upload_location and self._upload_location[upload_type]['jobID'] != self._job_id:
-			self._logger.debug("Discarding old upload url: {} for {}".format(upload_type, self._upload_location[upload_type]['jobID']))
+			self._logger.debug("Discarding old upload url: %s for %s", upload_type, self._upload_location[upload_type]['jobID'])
 			del self._upload_location[upload_type]
 		if upload_type not in self._upload_location or datetime.datetime.now() > self._upload_location[upload_type]['expires']:
 			self._get_url(upload_type, self._get_job_id() if upload_type == 'idle' else self._job_id)
@@ -744,7 +744,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		upload_type = 'idle'
 		if self._cloud_print and self._job_id != '123' and (self._printer.is_printing() or self._printer.is_paused()):
 			upload_type = 'printing'
-		self._logger.debug("upload_type {}".format(upload_type))
+		self._logger.debug("upload_type %s", upload_type)
 		if not self._ensure_upload_url(upload_type):
 			return
 		try:
@@ -752,7 +752,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			r = requests.get(self._snapshot_url, timeout=5)
 			r.raise_for_status()
 		except Exception:
-			self._logger.exception("Could not capture image from {}".format(self._snapshot_url))
+			self._logger.exception("Could not capture image from %s", self._snapshot_url)
 			return
 
 		try:
@@ -784,16 +784,14 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						if new_image_size <= self._max_image_size:
 							output.seek(0)
 							image_bytes = output
-							self._logger.debug("PIL compressed image from {} to {} bytes (quality {})".format(
-								image_size, new_image_size, quality))
+							self._logger.debug("PIL compressed image from %s to %s bytes (quality %s)", image_size, new_image_size, quality)
 							image_size = new_image_size
 							break
 					else:
 						# Even lowest quality didn't work, use it anyway
 						output.seek(0)
 						image_bytes = output
-						self._logger.debug("PIL compressed image from {} to {} bytes (min quality)".format(
-							image_size, new_image_size))
+						self._logger.debug("PIL compressed image from %s to %s bytes (min quality)", image_size, new_image_size)
 						image_size = new_image_size
 				elif _ffmpeg_path:
 					# Fall back to ffmpeg for compression (no transforms)
@@ -810,17 +808,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 					if needs_transform:
 						self._logger.warning("Neither PIL nor ffmpeg available, skipping image transformation")
 					if needs_resize:
-						self._logger.warning("Neither PIL nor ffmpeg available, image size {} exceeds max {} but uploading anyway".format(
-							image_size, self._max_image_size))
+						self._logger.warning("Neither PIL nor ffmpeg available, image size %s exceeds max %s but uploading anyway", image_size, self._max_image_size)
 
 			if image_size == 0:
-				self._logger.debug("Image content is length 0 from {}, not uploading to PolarCloud".format(self._snapshot_url))
+				self._logger.debug("Image content is length 0 from %s, not uploading to PolarCloud", self._snapshot_url)
 				return
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('image.jpg', image_bytes)})
 			p.raise_for_status()
-			self._logger.debug("{}: {}".format(p.status_code, p.content))
+			self._logger.debug("%s: %s", p.status_code, p.content)
 
-			self._logger.debug("Image captured from {}".format(self._snapshot_url))
+			self._logger.debug("Image captured from %s", self._snapshot_url)
 		except Exception:
 			self._logger.exception("Could not post snapshot to PolarCloud")
 
@@ -831,25 +828,25 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not path:
 			return
 		if not self._ensure_upload_url('timelapse'):
-			self._logger.error("Unable to retrieve valid destination to upload timelapse {}".format(path))
+			self._logger.error("Unable to retrieve valid destination to upload timelapse %s", path)
 			return
 		try:
-			self._logger.debug("Uploading timelapse {}".format(path))
+			self._logger.debug("Uploading timelapse %s", path)
 			loc = self._upload_location['timelapse']
 			p = requests.post(loc['url'], data=loc['fields'], files={'file': ('timelapse.mp4', open(path, 'rb'))})
 			p.raise_for_status()
-			self._logger.debug("timelapse upload result {}: {}".format(p.status_code, p.content))
+			self._logger.debug("timelapse upload result %s: %s", p.status_code, p.content)
 		except Exception:
-			self._logger.exception("Could not upload timelapse {} to PolarCloud".format(path))
+			self._logger.exception("Could not upload timelapse %s to PolarCloud", path)
 
 	#~~ getUrl -> polar: getUrlResponse
 
 	def _on_get_url_response(self, response, *args, **kwargs):
-		self._logger.debug('getUrlResponse {}'.format(repr(response)))
+		self._logger.debug('getUrlResponse %s', repr(response))
 		if not self._valid_packet(response):
 			return
 		if not has_all(response, 'status'):
-			self._logger.warn('getUrlResponse lacks status property')
+			self._logger.warning('getUrlResponse lacks status property')
 			return
 		if not response['status'] == 'SUCCESS':
 			self._logger.warning('Failed to get upload url: %s %s', response['status'], response.get('message', ''))
@@ -860,7 +857,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not has_all(response, 'jobID'):
 			response["jobID"] = self._job_id
 		self._upload_location[response.get('type', 'idle')] = response
-		self._logger.debug('response_type = {}'.format(response.get('type', '')))
+		self._logger.debug('response_type = %s', response.get('type', ''))
 		if response.get('type', '') == 'idle':
 			self._task_queue.put(self._upload_snapshot)
 
@@ -869,7 +866,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#	'printing'/'timelapse' for cloud initiated print only
 	# job_id - cloud assigned print job id ('123' for local print)
 	def _get_url(self, url_type, job_id):
-		self._logger.debug('getUrl url_type: {}, job_id: {}'.format(url_type, job_id))
+		self._logger.debug('getUrl url_type: %s, job_id: %s', url_type, job_id)
 		self._socket.emit('getUrl', {
 			'serialNumber': self._serial,
 			'method': 'post',
@@ -880,7 +877,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ polar: welcome -> hello
 
 	def _on_welcome(self, welcome, *args, **kwargs):
-		self._logger.debug('_on_welcome: {}'.format(repr(welcome)))
+		self._logger.debug('_on_welcome: %s', repr(welcome))
 		if 'challenge' in welcome:
 			self._challenge = welcome['challenge']
 			if not isinstance(self._challenge, bytes):
@@ -900,8 +897,8 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				if camUrl:
 					camUrl = normalize_url(camUrl)
 			except:
-				self._logger.exception("Unable to canonicalize the url {}".format(camUrl))
-			self._logger.debug("camUrl: {}".format(camUrl))
+				self._logger.exception("Unable to canonicalize the url %s", camUrl)
+			self._logger.debug("camUrl: %s", camUrl)
 			transformImg = 0
 			if self._settings.global_get(["webcam", "flipH"]):
 				transformImg += 1
@@ -922,12 +919,12 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			})
 			self._challenge = None
 		else:
-			self._logger.debug('skip emit hello, serial: {}'.format(self._serial))
+			self._logger.debug('skip emit hello, serial: %s', self._serial)
 
 	#~~ capabilities -> polar: capabilitiesResponse
 
 	def _on_capabilities_response(self, response, *args, **kwargs):
-		self._logger.debug('_on_capabilities_response: {}'.format(repr(response)))
+		self._logger.debug('_on_capabilities_response: %s', repr(response))
 		if 'capabilities' in response:
 			self._capabilities = response['capabilities']
 
@@ -946,7 +943,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ register -> polar: registerReponse
 
 	def _on_register_response(self, response, *args, **kwargs):
-		self._logger.debug('on_register_response: {}'.format(repr(response)))
+		self._logger.debug('on_register_response: %s', repr(response))
 		if 'serialNumber' in response:
 			self._serial = response['serialNumber']
 			self._settings.set(['serial'], self._serial)
@@ -995,7 +992,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._socket:
 			self._start_polar_status()
 			sleep(8) # give the thread a moment to start communicating
-			self._logger.debug("Do we have a socket: {}".format(repr(self._socket)))
+			self._logger.debug("Do we have a socket: %s", repr(self._socket))
 		if not self._socket:
 			self._logger.info("Can't register because unable to communicate with Polar Cloud")
 			return False
@@ -1018,7 +1015,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ unregister -> polar: unregisterReponse
 
 	def _on_unregister_response(self, response, *args, **kwargs):
-		self._logger.debug('on_unregister_response: {}'.format(repr(response)))
+		self._logger.debug('on_unregister_response: %s', repr(response))
 		if response['status'] == 'SUCCESS':
 			self._settings.set(['serial'], '')
 			self._settings.set(['email'], '')
@@ -1041,7 +1038,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if not self._socket:
 			self._start_polar_status()
 			sleep(8) # give the thread a moment to start communicating
-			self._logger.debug("Do we have a socket: {}".format(repr(self._socket)))
+			self._logger.debug("Do we have a socket: %s", repr(self._socket))
 		if not self._socket:
 			self._logger.info("Can't unregister because unable to communicate with Polar Cloud")
 			return False
@@ -1091,7 +1088,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		return slicer
 
 	def _on_print(self, data, *args, **kwargs):
-		self._logger.debug("on_print {0}".format(repr(data)))
+		self._logger.debug("on_print %s", repr(data))
 		if not self._valid_packet(data):
 			return
 		if self._print_preparer and self._print_preparer.is_alive():
@@ -1128,7 +1125,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.warning("PolarCloud asked us to print the %s, but this plugin doesn't know how to handle that type.", print_type)
 		ext = mapTypeToExt[print_type]
 
-		self._logger.debug("PolarCloud requested to print {}. Downloading to a file with ext: {}.".format(print_file, ext))
+		self._logger.debug("PolarCloud requested to print %s. Downloading to a file with ext: %s.", print_file, ext)
 
 		info = {}
 		pos = (0, 0)
@@ -1144,7 +1141,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				req_ini = requests.get(data['configFile'], timeout=5)
 				req_ini.raise_for_status()
 			except Exception:
-				self._logger.exception("Could not retrieve slicer config file from PolarCloud: {}".format(data['configFile']))
+				self._logger.exception("Could not retrieve slicer config file from PolarCloud: %s", data['configFile'])
 				return
 			slicer = self._get_slicer_name()
 			slicing_profile = None
@@ -1164,18 +1161,18 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			req_stl = requests.get(print_file, timeout=5)
 			req_stl.raise_for_status()
 		except Exception:
-			self._logger.exception("Could not retrieve print file from PolarCloud: {}".format(print_file))
+			self._logger.exception("Could not retrieve print file from PolarCloud: %s", print_file)
 			return
 
 		path = self._file_manager.add_folder(FileDestinations.LOCAL, "polarcloud")
 		path = self._file_manager.join_path(FileDestinations.LOCAL, path, "current-print")
 		pathGcode = path + ".gcode"
 		path = path + ext
-		self._logger.debug("Adding PolarCloud download as {}".format(path))
+		self._logger.debug("Adding PolarCloud download as %s", path)
 		self._file_manager.add_file(FileDestinations.LOCAL, path, StreamWrapper(path, BytesIO(req_stl.content)), allow_overwrite=True)
 		job_id = data['jobId'] if 'jobId' in data else "123"
-		self._logger.debug("print jobId is {}".format(job_id))
-		self._logger.debug("print data is {}".format(repr(data)))
+		self._logger.debug("print jobId is %s", job_id)
+		self._logger.debug("print data is %s", repr(data))
 
 		if self._printer.is_closed_or_error():
 			self._printer.disconnect()
@@ -1265,7 +1262,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return
 		for key in data:
 			if re.match("(?:bed)|(?:tool[0-9]+)", key):
-				self._logger.debug("set_temperature {} to {}", key, data[key])
+				self._logger.debug("set_temperature %s to %s", key, data[key])
 				self._printer.set_temperature(key, data[key])
 		self._status_now = True
 
@@ -1318,9 +1315,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				r = client.get("/api/system/commands")
 				r.raise_for_status()
 				commands_by_type = json.loads(r.content)
-				self._logger.debug("commands: {}".format(repr(commands_by_type)))
+				self._logger.debug("commands: %s", repr(commands_by_type))
 				for command_group in commands_by_type.values():
-					self._logger.debug("command_group: {}".format(repr(command_group)))
+					self._logger.debug("command_group: %s", repr(command_group))
 					for command in command_group:
 						command_list.append(_polar_custom_from_command(command['source'], command))
 			except Exception:
@@ -1338,7 +1335,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			self._logger.warning("customCommandList generated, but dropped because no changes detected.")
 
 	def _on_custom_command(self, data, *args, **kwargs):
-		self._logger.debug("customCommand: {}".format(repr(data)))
+		self._logger.debug("customCommand: %s", repr(data))
 		if not self._valid_packet(data):
 			return
 		try:
@@ -1349,9 +1346,9 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 			r = client.post("/api/system/commands/" + data['command'], {})
 			r.raise_for_status()
-			self._logger.debug("system/commands result {}: {}".format(r.status_code, r.content))
+			self._logger.debug("system/commands result %s: %s", r.status_code, r.content)
 		except Exception:
-			self._logger.exception("Could not execute system command: {}".format(repr(data)))
+			self._logger.exception("Could not execute system command: %s", repr(data))
 
 
 	#~~ jogPrinter
@@ -1364,7 +1361,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		# The data object should have a jogPrinter field which containts
 		# the JSON object that the Octopi API is expecting
 		jog_data = data['jogPrinter']
-		self._logger.debug("Jog command: {}".format(repr(jog_data)))
+		self._logger.debug("Jog command: %s", repr(jog_data))
 		api_command = "printhead"
 		if jog_data['command'] == 'extrude':
 			api_command = "tool"
@@ -1383,7 +1380,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			softwareupdate = self._get_softwareupdate_plugin()
 			if softwareupdate:
 				version_info = softwareupdate.get_current_versions(['octoprint'])[0]['octoprint']
-				self._logger.debug("version_info: {}".format(repr(version_info)))
+				self._logger.debug("version_info: %s", repr(version_info))
 				running_version = version_info['information']['local']['value']
 				latest_version = version_info['information']['remote']['value']
 		except:
@@ -1416,7 +1413,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				# send along the stats from the most recent status
 				payload['filamentUsed'] = self._status['filamentUsed']
 				payload['printSeconds'] = self._status['printSeconds']
-			self._logger.debug("job payload: {}".format(payload))
+			self._logger.debug("job payload: %s", payload)
 			self._socket.emit('job', payload)
 		self._status_now = True
 
@@ -1436,7 +1433,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 	#~~ EventHandlerPlugin mixin
 
 	def on_event(self, event, payload):
-		self._logger.debug("on_event: {}".format(repr(event)))
+		self._logger.debug("on_event: %s", repr(event))
 		if event == Events.PRINT_CANCELLED or event == Events.PRINT_FAILED:
 			self._pstate = self.PSTATE_CANCELLING
 			if self._cloud_print:
@@ -1444,7 +1441,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		elif event == Events.PRINT_STARTED or event == Events.PRINT_RESUMED:
 			self._pstate = self.PSTATE_PRINTING
 			self._update_interval = 10
-			self._logger.debug("Update interval to {}".format(self._update_interval))
+			self._logger.debug("Update interval to %s", self._update_interval)
 		elif event == Events.ERROR:
 			self._pstate = self.PSTATE_ERROR
 		elif event == Events.PRINT_PAUSED:
@@ -1503,7 +1500,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		self._status_now = True
 		if self._job_pending and not self._printer.is_printing() and not self._printer.is_paused() and self._pstate != self.PSTATE_PREPARING:
-			self._logger.debug("emitting job due to event: {}".format(event))
+			self._logger.debug("emitting job due to event: %s", event)
 			self._job(self._job_id, "canceled")
 
 	#~~ SimpleApiPlugin mixin
@@ -1633,7 +1630,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			return x * layer_height
 		def bool_from_int(x):
 			return not not x
-		self._logger.debug("layer_height={}; height_from_layer_count(3)={}".format(layer_height, height_from_layer_count(3)))
+		self._logger.debug("layer_height=%s; height_from_layer_count(3)=%s", layer_height, height_from_layer_count(3))
 
 		profile_from_engine_config = {
 			"layerthickness":       ("layer_height",       mm_from_um),
@@ -1776,7 +1773,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			if option in profile_from_engine_config:
 				key, translate = profile_from_engine_config[option]
 				if key:
-					self._logger.debug("key={}; value={}, {}".format(key, value, type(value)))
+					self._logger.debug("key=%s; value=%s, %s", key, value, type(value))
 					profile[key] = translate(value)
 					if "raft" in key:
 						profile["platform_adhesion"] = "raft"
@@ -1784,7 +1781,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 						if profile["support"] != "everywhere":
 							profile["support"] = "buildplate"
 				else:
-					self._logger.debug("Eating PolarCloud setting {}={}".format(option, value))
+					self._logger.debug("Eating PolarCloud setting %s=%s", option, value)
 			elif option == "supporteverywhere":
 				if value:
 					profile["support"] = "everywhere"
@@ -1800,7 +1797,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			else:
 				self._logger.warning("PolarCloud slicing profile contains unrecognized setting %s=%s", option, value)
 
-		self._logger.debug("Profile looks like this: {}".format(repr(profile)))
+		self._logger.debug("Profile looks like this: %s", repr(profile))
 		profile["fan_enabled"] = "fan_speed_max" in profile and profile["fan_speed_max"] > 0
 
 		try:
@@ -1836,14 +1833,14 @@ class PolarTimelapseTranscoder(object):
 	def _translate_timelapse_worker(self):
 		command = 'gst-launch-1.0 -e filesrc location="{infile}" ! decodebin name=decode ! x264enc ! queue ! qtmux name=mux ! filesink location={outfile} decode. ! mux.'.format(
 				infile=self._octoprint_movie, outfile=self._polar_movie)
-		self._logger.debug("timelapse command: {}".format(command))
+		self._logger.debug("timelapse command: %s", command)
 
 		try:
 			p = sarge.run(command, stdout=sarge.Capture(), stderr=sarge.Capture())
 			if p.returncode != 0:
 				self._logger.warning("Could not render movie, got return code %s: %s", p.returncode, p.stderr.text)
 			else:
-				self._logger.debug("gstreamer succeded: {}".format(p.stdout.text))
+				self._logger.debug("gstreamer succeded: %s", p.stdout.text)
 				self._callback(self._polar_movie)
 
 		except:
