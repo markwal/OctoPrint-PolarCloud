@@ -37,7 +37,6 @@ except ImportError:
 import base64
 import datetime
 from time import sleep
-import io
 from io import StringIO, BytesIO
 try:
 	from urllib.parse import urlparse, urlunparse
@@ -54,7 +53,7 @@ from Cryptodome.Hash import SHA256
 import socketio
 import sarge
 import flask
-from flask_babel import gettext, _
+from flask_babel import _
 import requests
 try:
 	from PIL import Image
@@ -212,7 +211,7 @@ def float_safe_get(dictionary, *keys):
 # return true if each of the list of keys are in the dictionary, otherwise false
 def has_all(dictionary, *keys):
 	for key in keys:
-		if not key in dictionary:
+		if key not in dictionary:
 			return False
 	return True
 
@@ -731,7 +730,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if upload_type != 'idle' and upload_type in self._upload_location and self._upload_location[upload_type]['jobID'] != self._job_id:
 			self._logger.debug("Discarding old upload url: {} for {}".format(upload_type, self._upload_location[upload_type]['jobID']))
 			del self._upload_location[upload_type]
-		if not upload_type in self._upload_location or datetime.datetime.now() > self._upload_location[upload_type]['expires']:
+		if upload_type not in self._upload_location or datetime.datetime.now() > self._upload_location[upload_type]['expires']:
 			self._get_url(upload_type, self._get_job_id() if upload_type == 'idle' else self._job_id)
 			return False
 		return True
@@ -1111,7 +1110,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			print_type = data['fileToPrint']
 		elif 'gcodeFile' in data:
 			print_type = 'gcodeFile'
-		if not print_type in data:
+		if print_type not in data:
 			self._logger.warn("PolarCloud sent print command, but data didn't contain a {} url.", print_type)
 			return
 		print_file = data[print_type]
@@ -1122,7 +1121,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 			'gcodeFile' : '.gcode',
 			'stlFile' : '.stl'
 			}
-		if not print_type in mapTypeToExt:
+		if print_type not in mapTypeToExt:
 			self._logger.warn("PolarCloud asked us to print the {}, but this plugin doesn't know how to handle that type.", print_type)
 		ext = mapTypeToExt[print_type]
 
@@ -1134,7 +1133,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 		if print_type == 'stlFile':
 			self._logger.debug("Checking slicer configuration.")
 			# need to slice then, so make sure we're set up to do that
-			if not 'configFile' in data:
+			if 'configFile' not in data:
 				self._logger.warn("PolarCloud sent print command without slicing profile.")
 				return
 			info['config'] = data['configFile']
@@ -1300,16 +1299,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 				'commandList': command_list
 			})
 			self._sent_command_list = command_list
-			self._logger.debug("customCommandList sent.");
+			self._logger.debug("customCommandList sent.")
 		else:
-			self._logger.warn("customCommandList generated, but dropped because no changes detected.");
+			self._logger.warn("customCommandList generated, but dropped because no changes detected.")
 
 	def _on_custom_command(self, data, *args, **kwargs):
 		self._logger.debug("customCommand: {}".format(repr(data)))
 		if not self._valid_packet(data):
 			return
 		try:
-			if not 'command' in data:
+			if 'command' not in data:
 				self._logger.warn("Ignoring custom command, no 'command' element: {}".format(repr(data)))
 				return
 			client = self._ensure_octoprint_client()
@@ -1325,7 +1324,7 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 	def _on_jog_printer(self, data, *args, **kwargs):
 		self._logger.warn("Jog request: {}".format(repr(data)))
-		if not 'jogPrinter' in data:
+		if 'jogPrinter' not in data:
 			self._logger.warn("Ignoring jogPrinter command, no jogPrinter in data: {}".format(repr(data)))
 			return
 		# The data object should have a jogPrinter field which containts
@@ -1587,11 +1586,16 @@ class PolarcloudPlugin(octoprint.plugin.SettingsPlugin,
 
 		posx = 0
 		posy = 0
-		mm_from_um = lambda x: x / 1000.0
-		no_translation = lambda x: x
-		width_from_line_count = lambda x: x * extrusion_width
-		height_from_layer_count = lambda x: x * layer_height
-		bool_from_int = lambda x: not not x
+		def mm_from_um(x):
+			return x / 1000.0
+		def no_translation(x):
+			return x
+		def width_from_line_count(x):
+			return x * extrusion_width
+		def height_from_layer_count(x):
+			return x * layer_height
+		def bool_from_int(x):
+			return not not x
 		self._logger.debug("layer_height={}; height_from_layer_count(3)={}".format(layer_height, height_from_layer_count(3)))
 
 		profile_from_engine_config = {
