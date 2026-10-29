@@ -73,21 +73,21 @@
     <div class="control-group">
         <div class="controls">
             <label class="checkbox">
-                <input type="checkbox" data-bind="checked: settings.upload_timelapse">{{ _('Upload timelapse videos to Polar Cloud.<br>Requires GStreamer install, see <A href="https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md">README</A>.') }}
+                <input type="checkbox" data-bind="checked: settings.upload_timelapse">{{ _('Upload timelapse videos to Polar Cloud.<br>Requires GStreamer install, see <A href="https://github.com/markwal/OctoPrint-PolarCloud/blob/master/README.md">README</A>.')|safe }}
             </label>
         </div>
     </div>
     <div class="control-group">
         <div class="controls">
             <label class="checkbox">
-                <input type="checkbox" data-bind="checked: settings.enable_system_commands">{{ _('Allow Polar Cloud to send system commands to OctoPrint<br>It\'s those commands on the power button icon ') }}<i class="icon-off"></i>{{ _(' at the top.') }}
+                <input type="checkbox" data-bind="checked: settings.enable_system_commands">{{ _('Allow Polar Cloud to send system commands to OctoPrint<br>It\'s those commands on the power button icon ')|safe }}<i class="icon-off"></i>{{ _(' at the top.') }}
             </label>
         </div>
     </div>
     <div class="control-group">
         <div class="controls">
             <label class="checkbox">
-                <input type="checkbox" data-bind="checked: settings.next_print">{{ _('Turn on Continuous Printing Mode for Belt Printers (<span style="color: #da4f49">CAUTION</span>: only for belt or continuous printers. more info <a href="https://all3dp.com/2/3d-printer-belt-all-you-need-to-know/">here.</a>)') }}
+                <input type="checkbox" data-bind="checked: settings.next_print">{{ _('Turn on Continuous Printing Mode for Belt Printers (<span style="color: #da4f49">CAUTION</span>: only for belt or continuous printers. more info <a href="https://all3dp.com/2/3d-printer-belt-all-you-need-to-know/">here.</a>)')|safe }}
             </label>
         </div>
     </div>
@@ -107,7 +107,7 @@
             <div class="row-fluid">
                 <div class="alert alert-error span9" data-bind="visible: registrationFailed">
                     {{ _('Failed to register OctoPrint with the Polar Cloud.') }}
-                    <span data-bind="html: registrationFailedReason"></span>
+                    <span data-bind="text: registrationFailedReason"></span>
                 </div>
             </div>
             <div class="control-group">
@@ -139,7 +139,7 @@
             <div>
                 <div class="alert alert-error" data-bind="visible: unregistrationFailed">
                     {{ _('Failed to unregister OctoPrint with the Polar Cloud.') }}
-                    <span data-bind="html: unregistrationFailedReason"></span>
+                    <span data-bind="text: unregistrationFailedReason"></span>
                 </div>
             </div>
             <div>
